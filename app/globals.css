@@ -1,26 +1,79 @@
 @import "tailwindcss";
 
+/*
+ * One neutral ramp, one accent, five grade colours. Every colour in the app
+ * comes from this block — components never hardcode a hex.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --canvas: #fbfbfa;
+  --surface: #ffffff;
+  --border: #e6e4e0;
+  --border-strong: #d2cfc9;
+  --ink: #191817;
+  --muted: #67655f;
+  --faint: #97948c;
+  --accent: #1f6f4a;
+  --track: #eceae5;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --grade-a: #1c7a4c;
+  --grade-b: #55761f;
+  --grade-c: #8d6a15;
+  --grade-d: #a1571b;
+  --grade-f: #a63232;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --canvas: #0c0c0b;
+    --surface: #151514;
+    --border: #262624;
+    --border-strong: #38372f;
+    --ink: #f1efec;
+    --muted: #a5a29a;
+    --faint: #6e6c66;
+    --accent: #6cc094;
+    --track: #232321;
+
+    --grade-a: #5fbf8b;
+    --grade-b: #a3c463;
+    --grade-c: #d6ac52;
+    --grade-d: #e28c4f;
+    --grade-f: #e26760;
   }
 }
 
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-track: var(--track);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background-color: var(--accent);
+  color: var(--canvas);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -1,0 +1,74 @@
+import { z } from "zod";
+
+/**
+ * Environment, parsed once at import time (SPEC §6).
+ *
+ * This throws rather than warning on purpose: a missing GITHUB_TOKEN silently
+ * drops GitHub to 60 requests/hour, and the app then dies mysteriously under
+ * any load (SPEC §8). Failing at boot turns a confusing production incident
+ * into an obvious startup error.
+ */
+
+const envSchema = z.object({
+  /** Fine-grained PAT: public repository read only, zero write scopes. */
+  GITHUB_TOKEN: z.string().min(1, "GITHUB_TOKEN is required"),
+
+  /** HMAC key for hashing caller IPs before storage. Enforced from M4. */
+  RATE_LIMIT_SECRET: z.string().min(1).optional(),
+
+  /** Neon connection string. Enforced from M2. */
+  DATABASE_URL: z.string().min(1).optional(),
+
+  /** v1 accepts exactly one provider. The seam exists; the choice does not. */
+  TIPS_PROVIDER: z.literal("rules").default("rules"),
+
+  NEXT_PUBLIC_SITE_URL: z.url().optional(),
+  VERCEL_PROJECT_PRODUCTION_URL: z.string().min(1).optional(),
+});
+
+function loadEnv() {
+  const parsed = envSchema.safeParse(process.env);
+
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((issue) => `  ${issue.path.join(".")}: ${issue.message}`)
+      .join("\n");
+    throw new Error(
+      `Invalid environment. Copy .env.example to .env and fill it in.\n${issues}`,
+    );
+  }
+
+  return parsed.data;
+}
+
+const env = loadEnv();
+
+export const GITHUB_TOKEN = env.GITHUB_TOKEN;
+export const RATE_LIMIT_SECRET = env.RATE_LIMIT_SECRET;
+export const DATABASE_URL = env.DATABASE_URL;
+export const TIPS_PROVIDER = env.TIPS_PROVIDER;
+
+/**
+ * Absolute base for OG and embed URLs. Falls back to the Vercel production
+ * host, then localhost — so M1 and M2 are unblocked while the production
+ * domain is still an open question (SPEC §12).
+ */
+export const SITE_URL: string =
+  env.NEXT_PUBLIC_SITE_URL ??
+  (env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
+
+/** Tuning constants (SPEC §11 assumption 3). Change freely. */
+export const SCORE_TTL_HOURS = 6;
+export const SCORE_STALE_CEILING_DAYS = 7;
+export const IMAGE_CACHE_SECONDS = 6 * 60 * 60;
+
+/** Cold scores permitted per IP per hour (SPEC §11 assumption 4). */
+export const COLD_SCORES_PER_HOUR = 30;
+
+/**
+ * The rubric weights this build produces. Bumped in the same commit as any
+ * weight change; a cached row at an older version is a cache miss (SPEC §8).
+ */
+export const RUBRIC_VERSION = 1;
