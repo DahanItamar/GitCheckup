@@ -15,7 +15,11 @@ const API_BASE = "https://api.github.com";
 /** SPEC §8: one slow call must not consume the function's whole budget. */
 const REQUEST_TIMEOUT_MS = 5_000;
 
-const USER_AGENT = "RepoGauge (+https://github.com/repogauge)";
+/**
+ * GitHub asks that clients identify themselves, and uses this to reach the
+ * operator when a client misbehaves (SPEC §11.1).
+ */
+const USER_AGENT = "RepoGauge (+https://github.com/DahanItamar/RepoGauge)";
 
 /**
  * GETs a path under api.github.com and parses the JSON body.

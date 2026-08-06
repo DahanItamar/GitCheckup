@@ -131,7 +131,7 @@ Because: one runtime means one set of capabilities to reason about. `ImageRespon
 ### Directory layout
 
 ```
-repogauge/
+RepoGauge/
 ├── app/
 │   ├── layout.tsx                   # Root shell, fonts, theme. No data fetching.
 │   ├── page.tsx                     # Landing: URL input, example repos, recent scores strip.
@@ -463,7 +463,7 @@ Only call #1 is fatal. Any other rejection degrades that signal to its "absent" 
 | ------------------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/score?repo={owner}/{name}` | Full score as JSON                              | `?repo=facebook/react` → `{ repo: {owner,name,stars}, score: ScoreResult, fetchedAt: string, cached: boolean }` | `400 INVALID_SLUG` · `404 REPO_NOT_FOUND` · `429 RATE_LIMITED` (+`Retry-After`) · `502 UPSTREAM_UNAVAILABLE`                       |
 | `GET /api/og?repo={owner}/{name}`    | 1200×630 PNG share card                         | → `image/png`                                                                                                   | On any error, returns a **200 with a fallback card** reading "Couldn't score this repo" — never a broken image in someone's README |
-| `GET /api/badge?repo={owner}/{name}` | Shields-style SVG badge                         | `&style=flat\|flat-square` → `image/svg+xml`                                                                    | Same fallback rule: renders `repogauge \| unknown` at 200                                                                          |
+| `GET /api/badge?repo={owner}/{name}` | Shields-style SVG badge                         | `&style=flat\|flat-square` → `image/svg+xml`                                                                    | Same fallback rule: renders `RepoGauge \| unknown` at 200                                                                          |
 | `GET /`                              | Landing: input, examples, recent-scores strip   | HTML                                                                                                            | —                                                                                                                                  |
 | `GET /r/{owner}/{repo}`              | Result page, server-rendered with OG meta       | HTML                                                                                                            | Typed error → `error.tsx` copy                                                                                                     |
 | `GET /trending`                      | Leaderboard, top 20 by score in the last 7 days | HTML                                                                                                            | —                                                                                                                                  |
@@ -560,7 +560,7 @@ Both are properties of the tip provider, not the rubric — the points are still
 1. On `/r/{owner}/{repo}`, `EmbedSnippets` shows two prefilled snippets built from `NEXT_PUBLIC_SITE_URL`:
    - Card: `[![RepoGauge](https://site/api/og?repo=owner/name)](https://site/r/owner/name)`
    - Badge: `[![RepoGauge](https://site/api/badge?repo=owner/name)](https://site/r/owner/name)`
-2. "Copy Markdown" writes to the clipboard; "Download PNG" fetches `/api/og` and triggers a download with filename `repogauge-{owner}-{name}.png`.
+2. "Copy Markdown" writes to the clipboard; "Download PNG" fetches `/api/og` and triggers a download with filename `RepoGauge-{owner}-{name}.png`.
 
 Both snippets wrap the image in a link back to the result page — that link is the acquisition loop and it is not optional.
 
@@ -591,7 +591,7 @@ The 50-star floor is deliberate: without it, the leaderboard is whatever anyone 
 | Neon free tier auto-suspends after idle                | First request after a quiet period pays a cold-start penalty                | Accepted: the HTTP driver's wake is a few hundred ms and it's amortized across the request. Documented in the README so it isn't diagnosed as a bug.                                                                                                           |
 | `/trending` before any repos are scored                | An empty page as the second impression                                      | Landing and trending both seed with a hardcoded example set (`facebook/react`, `vercel/next.js`, `rust-lang/rust`, `sveltejs/svelte`) rendered as suggestions when the query returns fewer than 6 rows.                                                        |
 | Two requests score the same cold repo simultaneously   | Two GitHub fan-outs, two `scores` rows                                      | Accepted. `scores` is append-only, so a duplicate row is harmless and the latest wins. Locking to save one duplicate fetch isn't worth the deadlock surface.                                                                                                   |
-| Unicode / very long owner or repo names                | Layout break in the OG card                                                 | `lib/repo-slug.ts` enforces GitHub's own rules: owner ≤39 chars matching `^[A-Za-z0-9](?:[A-Za-z0-9]                                                                                                                                                           | -(?=[A-Za-z0-9])){0,38}$`, repo ≤100 chars matching `^[A-Za-z0-9._-]+$`. Anything else is `400` before a query runs. The card also truncates at render. |
+| Unicode / very long owner or repo names                | Layout break in the OG card                                                 | `lib/repo-slug.ts` enforces GitHub's own rules: owner ≤39 chars matching `^[A-Za-z0-9](?:[A-Za-z0-9]\|-(?=[A-Za-z0-9])){0,38}$`, repo ≤100 chars matching `^[A-Za-z0-9._-]+$`. Anything else is `400` before a query runs. The card also truncates at render.  |
 
 ### [M1] The scale's floor is ~24, not 0
 
@@ -709,7 +709,7 @@ End state: the repo alone sells it.
 
 Numbered so any one can be rejected without reopening the rest.
 
-1. **The repo lives at `C:\Users\USER\Documents\repogauge` and the npm/GitHub name is `repogauge`.** If the name changes, only the README, the wordmark in the OG card, and the deployed domain change.
+1. **[M1] The repo lives at `C:\Users\USER\Documents\RepoGauge` and the GitHub name is `DahanItamar/RepoGauge`.** Revised from the original lowercase `repogauge`: the product name is `RepoGauge`, and the identifiers now match it everywhere rather than splitting brand from slug. `package.json` carries `"name": "RepoGauge"` too — legal because the package is `private: true`. **If this package is ever published to npm, that name must go back to lowercase**; npm rejects capitals outright. Nothing else depends on the casing: GitHub paths are case-insensitive and redirect from the old slug, and Windows paths are case-insensitive, so the rename broke no reference.
 2. **A single server-side PAT serves all users; there is no per-user token entry.** Rejecting this adds an optional "paste your own token" field and a whole trust conversation about handling someone else's credential — a meaningfully different product.
 3. **6-hour score TTL, 7-day stale ceiling, 6-hour CDN cache on images.** Pure tuning constants in `lib/config.ts`; change freely.
 4. **30 cold scores per IP per hour.** A guess calibrated to "one enthusiastic human, not a script." Adjust after seeing real traffic.
