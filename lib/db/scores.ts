@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, ne, or, sql } from "drizzle-orm";
 
 import { SCORE_HISTORY_DAYS } from "@/lib/config";
 import type { Grade, ScoreResult } from "@/lib/score/types";
@@ -290,7 +290,48 @@ export async function sweepScoreHistory(now: Date = new Date()): Promise<void> {
  * overwrites owner/name with the canonical values the API just returned
  * (SPEC §8).
  */
+/**
+ * Frees this slug if a *different* repository currently holds it.
+ *
+ * Deletes at most one row, and only when `github_id` differs — a repository
+ * keeping its own slug is the overwhelmingly common case and touches nothing.
+ * Any alias rows cascade with it, which is correct: they pointed at a
+ * repository that no longer answers to this name.
+ */
+async function releaseSlugHeldByAnotherRepo(
+  record: ScoreRecord,
+): Promise<void> {
+  await db
+    .delete(repos)
+    .where(
+      and(
+        eq(sql`lower(${repos.owner})`, record.owner.toLowerCase()),
+        eq(sql`lower(${repos.name})`, record.name.toLowerCase()),
+        ne(repos.githubId, record.githubId),
+      ),
+    );
+}
+
 async function upsertRepo(record: ScoreRecord): Promise<number> {
+  // `repos` is unique on two things: `github_id`, the real identity, and the
+  // slug. `ON CONFLICT` takes one target, so the other can still collide —
+  // and it does, whenever a slug moves between repositories:
+  //
+  //   - a repository is deleted and recreated, keeping its name but getting a
+  //     fresh `github_id` (observed on this very project);
+  //   - one is renamed away from a slug and another takes it.
+  //
+  // The insert then finds no conflict on `github_id`, proceeds, and violates
+  // the slug index instead. `saveScore` throws, `computeAndPersist` logs
+  // "failed to persist score", and the caller still gets their number — so
+  // nothing looks wrong while that repository is never cached again. Every
+  // later request is a fresh six-call fan-out, permanently.
+  //
+  // The stale row is released first. Its scores cascade, which is the right
+  // loss: they describe a *different* repository, and leaving them under a
+  // slug that has moved would attribute one project's history to another.
+  await releaseSlugHeldByAnotherRepo(record);
+
   const rows = await db
     .insert(repos)
     .values({
