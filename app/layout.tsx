@@ -65,7 +65,6 @@ export default function RootLayout({
               >
                 Most improved
               </Link>
-              <span className="text-faint">Public data only</span>
             </nav>
           </div>
         </header>
