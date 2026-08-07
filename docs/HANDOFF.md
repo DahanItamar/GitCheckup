@@ -140,10 +140,23 @@ intersection of multiple CSP headers, so it would override the app's own,
 block Next's inline hydration script, and leave a page that returns 200 and
 does nothing. The app ships its own headers — see `next.config.ts`.
 
-`TRUSTED_CLIENT_IP_HEADER` is `x-real-ip`, because nginx is the edge and sets
-it from `$remote_addr`. If Cloudflare proxying is ever switched on it **must**
-become `cf-connecting-ip`, or the per-IP rate limit is bypassable by sending
-your own `X-Forwarded-For`.
+`TRUSTED_CLIENT_IP_HEADER` is **`cf-connecting-ip`**, set in anticipation of
+Cloudflare proxying. Behind the orange cloud nginx sees a Cloudflare edge
+address as `$remote_addr`, so `x-real-ip` would put every visitor in one
+rate-limit bucket to throttle each other; `CF-Connecting-IP` carries the real
+client and Cloudflare strips any client-supplied copy. **While the cloud is
+grey this header does not arrive**, so `clientIpFrom` returns undefined and
+the limiter fails open — deliberate, and much safer than a shared bucket.
+
+Two things that must hold once the cloud is orange:
+
+- **Cloudflare SSL/TLS mode must be Full (strict).** Certbot added an
+  HTTP→HTTPS redirect to the vhost; on _Flexible_, Cloudflare would fetch over
+  HTTP, get redirected to HTTPS, and loop until the site is down.
+- **Certificate renewal uses HTTP-01**, which normally survives proxying
+  because Cloudflare forwards `/.well-known/acme-challenge/` to the origin. If
+  a renewal ever fails, switch this domain to DNS-01. Next renewal is due
+  around 2026-10-06.
 
 ---
 
