@@ -54,8 +54,11 @@ export async function findLatestScore(slug: {
     .from(scores)
     .innerJoin(repos, eq(scores.repoId, repos.id))
     .where(matchesSlug(slug))
-    // scores_latest_idx serves exactly this ordering.
-    .orderBy(desc(scores.fetchedAt))
+    // scores_latest_idx serves exactly this ordering. The id breaks ties:
+    // two rows written in the same millisecond share a timestamp, and without
+    // it Postgres may return either — meaning the page could show a superseded
+    // score while a newer one sits in the table.
+    .orderBy(desc(scores.fetchedAt), desc(scores.id))
     .limit(1);
 
   const row = rows[0];
@@ -75,25 +78,96 @@ export async function findLatestScore(slug: {
 }
 
 /**
- * Upserts the repo and appends a score row.
+ * Upserts the repo, then either touches the newest score row or appends one.
  *
- * `scores` is append-only, so two requests racing on the same cold repo
- * simply write two rows and the latest wins — locking to save one duplicate
- * fetch isn't worth the deadlock surface (SPEC §8).
+ * A rescan that finds nothing changed updates `fetched_at` in place instead of
+ * writing a duplicate. Most rescans are exactly that: the rubric reads a dozen
+ * booleans and two counts, and a repository does not usually differ six hours
+ * later. Appending unconditionally meant the table measured how often people
+ * looked, not how often anything changed — and the "Rescore now" button makes
+ * that far worse than the 6-hour TTL ever did, since one caller can spend a
+ * 30-per-hour budget on a single repo and write thirty identical rows.
+ *
+ * A row is still appended whenever the score actually differs, so the history
+ * that survives is the history worth keeping: the points at which a repository
+ * changed.
+ *
+ * Two requests racing on the same cold repo may still both append — the read
+ * and the write are not in one transaction. That is the pre-existing tradeoff
+ * (SPEC §8): locking to save one duplicate row is not worth the deadlock
+ * surface, and the sweep collects it later.
  */
 export async function saveScore(record: ScoreRecord): Promise<void> {
   const repoId = await upsertRepo(record);
+  const touched = await touchIfUnchanged(repoId, record);
 
-  await db.insert(scores).values({
-    repoId,
-    total: record.score.total,
-    grade: record.score.grade,
-    categories: record.score.categories,
-    tips: record.score.tips,
-    rubricVersion: record.rubricVersion,
-  });
+  if (!touched) {
+    await db.insert(scores).values({
+      repoId,
+      total: record.score.total,
+      grade: record.score.grade,
+      categories: record.score.categories,
+      tips: record.score.tips,
+      rubricVersion: record.rubricVersion,
+    });
+  }
 
   await maybeSweepHistory();
+}
+
+/**
+ * Bumps the newest row's timestamp when the score it holds is identical.
+ *
+ * The comparison happens in Postgres, not in JavaScript, and that is the whole
+ * design. `categories` and `tips` are `jsonb`, and **jsonb does not preserve
+ * key order** — it normalises on write — so a `JSON.stringify` comparison
+ * against the object that was inserted fails even when the two are the same
+ * data. `jsonb =` is defined semantically and gets it right. This was found by
+ * a test asserting thirty identical rescans produce one row; they produced
+ * thirty.
+ *
+ * The `order by fetched_at desc, id desc` tie-break matters as much. Two saves
+ * inside the same millisecond share a timestamp, and without the serial id to
+ * break the tie Postgres may return either — so a rescan could compare itself
+ * against a superseded row and append a duplicate of the current one.
+ *
+ * A row from an older rubric never matches, because `rubric_version` is in the
+ * predicate: that is a different question, not a stale answer (SPEC §8), and
+ * must be superseded rather than overwritten.
+ *
+ * @returns true when a row was updated and no insert is needed.
+ */
+async function touchIfUnchanged(
+  repoId: number,
+  record: ScoreRecord,
+): Promise<boolean> {
+  const updated = await db.execute<{ id: number }>(sql`
+    update ${scores}
+       -- Unqualified on purpose: Postgres rejects "scores"."fetched_at" as a
+       -- SET target, and drizzle qualifies every column reference it expands.
+       set fetched_at = now()
+     where ${scores.id} = (
+             select ${scores.id} from ${scores}
+              where ${scores.repoId} = ${repoId}
+              order by ${scores.fetchedAt} desc, ${scores.id} desc
+              limit 1
+           )
+       and ${scores.total} = ${record.score.total}
+       and ${scores.grade} = ${record.score.grade}
+       and ${scores.rubricVersion} = ${record.rubricVersion}
+       and ${scores.categories} = ${JSON.stringify(record.score.categories)}::jsonb
+       and ${scores.tips} = ${JSON.stringify(record.score.tips)}::jsonb
+    returning ${scores.id}
+  `);
+
+  return rowsOf(updated).length > 0;
+}
+
+/** The neon-http and PGlite drivers disagree on the shape they return. */
+function rowsOf(result: unknown): unknown[] {
+  if (Array.isArray(result)) return result;
+  const rows = (result as { rows?: unknown }).rows;
+  return Array.isArray(rows) ? rows : [];
 }
 
 /** Superseded rows are swept on roughly this share of writes — no cron. */
