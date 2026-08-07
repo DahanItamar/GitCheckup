@@ -42,9 +42,9 @@ const { getOrComputeScore } = await import("./score-repo");
 
 describe("getOrComputeScore in demo mode", () => {
   it("scores a bundled repo without any IO", async () => {
-    const result = await getOrComputeScore(assertRepoSlug("facebook/react"));
+    const result = await getOrComputeScore(assertRepoSlug("react/react"));
 
-    expect(result.repo).toMatchObject({ owner: "facebook", name: "react" });
+    expect(result.repo).toMatchObject({ owner: "react", name: "react" });
     expect(result.score.total).toBeGreaterThan(0);
     expect(result.score.categories).toHaveLength(5);
 
@@ -78,8 +78,8 @@ describe("getOrComputeScore in demo mode", () => {
 
   it("ignores neverRefresh, having nothing to refresh from", async () => {
     // The image routes pass it on every Camo hit; it must not change the path.
-    const direct = await getOrComputeScore(assertRepoSlug("facebook/react"));
-    const embed = await getOrComputeScore(assertRepoSlug("facebook/react"), {
+    const direct = await getOrComputeScore(assertRepoSlug("react/react"));
+    const embed = await getOrComputeScore(assertRepoSlug("react/react"), {
       neverRefresh: true,
     });
 

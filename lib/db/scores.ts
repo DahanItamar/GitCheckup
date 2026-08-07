@@ -1,10 +1,10 @@
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 
 import { SCORE_HISTORY_DAYS } from "@/lib/config";
 import type { Grade, ScoreResult } from "@/lib/score/types";
 
 import { db } from "./client";
-import { repos, scores } from "./schema";
+import { repoAliases, repos, scores } from "./schema";
 
 /**
  * Every score read and write in the system (SPEC §3). Nothing above this
@@ -27,6 +27,14 @@ export interface ScoreRecord {
   isArchived: boolean;
   score: ScoreResult;
   rubricVersion: number;
+
+  /**
+   * The slug the caller asked for, when it differs from the canonical one
+   * GitHub returned — `facebook/react` for `react/react`, say. Recorded as an
+   * alias so the next lookup by that name is a cache hit rather than another
+   * six-call fan-out.
+   */
+  requestedSlug?: { owner: string; name: string };
 }
 
 /**
@@ -53,7 +61,10 @@ export async function findLatestScore(slug: {
     })
     .from(scores)
     .innerJoin(repos, eq(scores.repoId, repos.id))
-    .where(matchesSlug(slug))
+    // A left join, so an alias is optional: most repos have none, and an inner
+    // join would hide every repo that has never been renamed.
+    .leftJoin(repoAliases, eq(repoAliases.repoId, repos.id))
+    .where(matchesSlugOrAlias(slug))
     // scores_latest_idx serves exactly this ordering. The id breaks ties:
     // two rows written in the same millisecond share a timestamp, and without
     // it Postgres may return either — meaning the page could show a superseded
@@ -151,6 +162,11 @@ export async function findScoreHistory(
  */
 export async function saveScore(record: ScoreRecord): Promise<void> {
   const repoId = await upsertRepo(record);
+
+  if (record.requestedSlug !== undefined) {
+    await rememberAlias(repoId, record.requestedSlug, record);
+  }
+
   const touched = await touchIfUnchanged(repoId, record);
 
   if (!touched) {
@@ -505,4 +521,52 @@ function matchesSlug(slug: { owner: string; name: string }) {
     eq(sql`lower(${repos.owner})`, slug.owner.toLowerCase()),
     eq(sql`lower(${repos.name})`, slug.name.toLowerCase()),
   );
+}
+
+/**
+ * The repo's current slug, or any slug it used to answer to.
+ *
+ * Both halves in one predicate rather than two queries: on the Neon HTTP
+ * driver every statement is its own request, so "look it up, then look up the
+ * alias" would double the latency of the commonest read in the app to serve
+ * the rarest case.
+ */
+function matchesSlugOrAlias(slug: { owner: string; name: string }) {
+  return or(
+    matchesSlug(slug),
+    and(
+      eq(sql`lower(${repoAliases.owner})`, slug.owner.toLowerCase()),
+      eq(sql`lower(${repoAliases.name})`, slug.name.toLowerCase()),
+    ),
+  );
+}
+
+/**
+ * Records that `requested` is another name for this repo.
+ *
+ * Only called when the two actually differ, so an unrenamed repo never writes
+ * here. Conflicts are ignored rather than updated: the pair is the identity,
+ * and a second request for the same old slug has nothing new to say.
+ *
+ * Failure is swallowed. This is an optimisation for later requests, and losing
+ * it costs a cache miss — never the score the caller is waiting on.
+ */
+async function rememberAlias(
+  repoId: number,
+  requested: { owner: string; name: string },
+  canonical: { owner: string; name: string },
+): Promise<void> {
+  const same =
+    requested.owner.toLowerCase() === canonical.owner.toLowerCase() &&
+    requested.name.toLowerCase() === canonical.name.toLowerCase();
+  if (same) return;
+
+  try {
+    await db
+      .insert(repoAliases)
+      .values({ repoId, owner: requested.owner, name: requested.name })
+      .onConflictDoNothing();
+  } catch (cause) {
+    console.error("[scores] could not record slug alias", cause);
+  }
 }

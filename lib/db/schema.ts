@@ -55,6 +55,51 @@ export const repos = pgTable(
   ],
 );
 
+/**
+ * Slugs a repository has answered to, other than its current one.
+ *
+ * GitHub keeps every old `owner/name` working forever: `facebook/react` still
+ * resolves, as a `301` to `react/react`, years after the transfer. The API
+ * returns the canonical identity, so that is what `repos` stores — which meant
+ * a lookup by the *requested* slug found nothing and every single request for
+ * a renamed repo was a cold six-call fan-out. Permanently: nothing about
+ * scoring it again makes the next lookup match.
+ *
+ * That is worst exactly where it is least visible. `/api/og` and `/api/badge`
+ * are called by GitHub's Camo proxy on every README view, and a README that
+ * embeds an old slug would spend six calls of the 5000/hr budget on each cache
+ * miss, with nobody waiting on the result (SPEC §7 Flow B).
+ *
+ * A row is written only when a requested slug turns out to differ from the
+ * canonical one, so the common case costs nothing.
+ */
+export const repoAliases = pgTable(
+  "repo_aliases",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+
+    repoId: bigint("repo_id", { mode: "number" })
+      .notNull()
+      .references(() => repos.id, { onDelete: "cascade" }),
+
+    /** The slug as it was asked for, in the casing GitHub reported. */
+    owner: text("owner").notNull(),
+    name: text("name").notNull(),
+
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Same case-insensitive rule as `repos_slug_idx`: GitHub slugs are
+    // case-insensitive, so one alias may not be stored twice in two casings.
+    uniqueIndex("repo_aliases_slug_idx").on(
+      sql`lower(${table.owner})`,
+      sql`lower(${table.name})`,
+    ),
+  ],
+);
+
 export const scores = pgTable(
   "scores",
   {

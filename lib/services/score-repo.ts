@@ -148,6 +148,10 @@ async function computeAndPersist(
       isArchived: signals.isArchived,
       score: result,
       rubricVersion: RUBRIC_VERSION,
+      // What was asked for, which is not always what GitHub returned: a
+      // renamed or transferred repo answers under its canonical slug. Passing
+      // it lets the next lookup by the old name hit the cache.
+      requestedSlug: { owner: slug.owner, name: slug.name },
     });
   } catch (cause) {
     console.error("[score-repo] failed to persist score", cause);

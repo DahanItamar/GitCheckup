@@ -77,7 +77,7 @@ environment.
 
 ## Status
 
-All five milestones are built. 328 tests, CI green.
+All five milestones are built. 338 tests, CI green.
 
 `DEMO_MODE=1` runs the whole interface with no credentials at all — see
 [docs/HANDOFF.md](docs/HANDOFF.md). It is how the UI is reviewed locally, and

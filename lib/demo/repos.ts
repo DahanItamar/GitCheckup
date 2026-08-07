@@ -20,7 +20,11 @@ interface DemoRepo extends Omit<RepoSignals, "pushedAt"> {
 
 const FIXTURES: DemoRepo[] = [
   {
-    owner: "facebook",
+    // `react/react`, not `facebook/react`: the repository was transferred to
+    // the `react` org, and api.github.com/repos/facebook/react now answers a
+    // 301 to this. The canonical slug is what production stores, so it is what
+    // the demo must show.
+    owner: "react",
     name: "react",
     githubId: 10270250,
     description: "The library for web and native user interfaces.",

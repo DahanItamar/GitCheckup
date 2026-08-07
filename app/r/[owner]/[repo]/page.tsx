@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { CategoryBreakdown } from "@/components/CategoryBreakdown";
 import { CompareInput } from "@/components/CompareInput";
@@ -99,6 +100,25 @@ export default async function ResultPage({ params }: RouteParams) {
       );
     }
     throw error;
+  }
+
+  // GitHub keeps every old slug working, so `/r/facebook/react` and
+  // `/r/react/react` are the same repository. Left alone that splits the
+  // shareable URL (Flow A step 3) and the score history in two.
+  //
+  // Outside the try/catch above: `redirect()` signals by throwing, and a catch
+  // that inspected it would swallow the navigation.
+  //
+  // This lands as a **client-side** redirect, not a 307. The canonical name is
+  // only known after the score resolves, by which time the streaming response
+  // has committed its status — so Next puts the instruction in the RSC payload
+  // instead. Browsers follow it; `curl` sees a 200. That is acceptable because
+  // it is cosmetic: `findLatestScore` resolves the old slug through
+  // `repo_aliases`, so both URLs are cache hits either way, and
+  // `generateMetadata` still emits a correct card for whichever was requested.
+  const canonical = { owner: result.repo.owner, name: result.repo.name };
+  if (canonical.owner !== slug.owner || canonical.name !== slug.name) {
+    redirect(`/r/${canonical.owner}/${canonical.name}`);
   }
 
   // After the score, and never blocking it: the trend is decoration on a page

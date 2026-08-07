@@ -20,15 +20,15 @@ const MIN_STARS = 50;
 
 describe("findDemoSignals", () => {
   it("finds a bundled repo", () => {
-    const signals = findDemoSignals({ owner: "facebook", name: "react" }, NOW);
+    const signals = findDemoSignals({ owner: "react", name: "react" }, NOW);
 
-    expect(signals?.owner).toBe("facebook");
+    expect(signals?.owner).toBe("react");
     expect(signals?.name).toBe("react");
   });
 
   it("matches case-insensitively, like GitHub's own slugs", () => {
     expect(
-      findDemoSignals({ owner: "FaceBook", name: "React" }, NOW),
+      findDemoSignals({ owner: "React", name: "REACT" }, NOW),
     ).not.toBeNull();
   });
 
@@ -39,7 +39,7 @@ describe("findDemoSignals", () => {
   });
 
   it("resolves every slug it advertises", () => {
-    // A typo in an owner field — `react/react` for `facebook/react` — passes
+    // A wrong owner field passes
     // the type checker, renders a dead GitHub link, and turns the repo people
     // are most likely to type into a not-found page.
     for (const signals of allDemoSignals(NOW)) {
