@@ -4,6 +4,7 @@ import type { Grade } from "@/lib/score/types";
 
 import { gradeChip, gradeColor } from "./grade-color";
 import { ArrowRightIcon, StarIcon } from "./icons";
+import { ScoreTrendLine } from "./ScoreSparkline";
 
 /**
  * Declared here rather than imported from lib/db: components take props, and
@@ -16,6 +17,8 @@ export interface TrendingItem {
   stars: number;
   total: number;
   grade: Grade;
+  /** Score sequence, oldest first. Empty means no line is drawn. */
+  trend?: number[];
 }
 
 /**
@@ -42,6 +45,11 @@ export function TrendingList({ repos }: { repos: TrendingItem[] }) {
             <span className="flex shrink-0 items-center gap-1 text-xs tabular-nums text-faint">
               <StarIcon className="size-3" />
               {formatStars(repo.stars)}
+            </span>
+            {/* Shape only. The score column beside it carries the number, so
+                the line answers "climbing or sliding?" and nothing else. */}
+            <span className="hidden shrink-0 sm:block">
+              <ScoreTrendLine totals={repo.trend ?? []} grade={repo.grade} />
             </span>
             {/* The score is the row's verdict, so it gets the only fill in it. */}
             <span

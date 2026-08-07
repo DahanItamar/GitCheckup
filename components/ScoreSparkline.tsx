@@ -123,6 +123,63 @@ export function ScoreSparkline({
   );
 }
 
+const ROW_WIDTH = 52;
+const ROW_HEIGHT = 16;
+
+/**
+ * The leaderboard version: shape only, no labels, no marker, no table.
+ *
+ * A board row already prints the current score beside it, so the line's whole
+ * job is answering "climbing or sliding?" at a glance. Twenty of these, each
+ * with a caption and its own data table, would drown the list they annotate —
+ * this is the small-multiples case, where the reader compares silhouettes and
+ * reads exact numbers from the column next to them.
+ */
+export function ScoreTrendLine({
+  totals,
+  grade,
+}: {
+  totals: number[];
+  grade: Grade;
+}) {
+  if (totals.length < 2) return null;
+
+  const points = totals.map((total, i) => ({ total, at: new Date(i) }));
+  const { toY } = scale(points, ROW_HEIGHT);
+  const step = (ROW_WIDTH - 2) / (totals.length - 1);
+  const line = totals
+    .map((total, i) => `${round(1 + i * step)},${toY(total)}`)
+    .join(" ");
+
+  const direction =
+    totals[totals.length - 1]! > totals[0]!
+      ? "rising"
+      : totals[totals.length - 1]! < totals[0]!
+        ? "falling"
+        : "unchanged";
+
+  return (
+    <svg
+      width={ROW_WIDTH}
+      height={ROW_HEIGHT}
+      viewBox={`0 0 ${ROW_WIDTH} ${ROW_HEIGHT}`}
+      role="img"
+      aria-label={`Trend ${direction}, ${totals[0]} to ${totals[totals.length - 1]}`}
+      className="shrink-0"
+    >
+      <polyline
+        points={line}
+        fill="none"
+        stroke={gradeColor(grade)}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.75}
+      />
+    </svg>
+  );
+}
+
 /**
  * Maps index → x and score → y.
  *
@@ -132,7 +189,7 @@ export function ScoreSparkline({
  * sequence of moves, not their tempo. The caption states the window so the
  * axis being ordinal is never a surprise.
  */
-function scale(points: SparkPoint[]) {
+function scale(points: SparkPoint[], height: number = HEIGHT) {
   const totals = points.map((p) => p.total);
   const low = Math.min(...totals);
   const high = Math.max(...totals);
@@ -142,7 +199,7 @@ function scale(points: SparkPoint[]) {
   const max = Math.min(100, high + pad);
   const span = max - min || 1;
 
-  const usable = HEIGHT - PAD * 2;
+  const usable = height - PAD * 2;
   const step = points.length > 1 ? (WIDTH - PAD * 2) / (points.length - 1) : 0;
 
   return {

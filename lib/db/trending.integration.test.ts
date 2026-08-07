@@ -226,8 +226,17 @@ describe("findTrending", () => {
       runs: [{ total: 77, daysAgo: 1 }],
     });
 
-    expect(await trending()).toEqual([
-      { owner: "owner", name: "shaped", stars: 1234, total: 77, grade: "A" },
-    ]);
+    const [row] = await trending();
+
+    expect(row).toEqual({
+      owner: "owner",
+      name: "shaped",
+      stars: 1234,
+      total: 77,
+      grade: "A",
+      // Carried out of the query so the caller can fetch every row's trend in
+      // one round trip. A serial, so pinned by type rather than by value.
+      repoId: expect.any(Number),
+    });
   });
 });

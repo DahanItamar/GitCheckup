@@ -1,5 +1,9 @@
 import { DEMO_MODE, RUBRIC_VERSION } from "@/lib/config";
-import { findTrending, type TrendingRepo } from "@/lib/db/scores";
+import {
+  findScoreTrends,
+  findTrending,
+  type TrendingRepo,
+} from "@/lib/db/scores";
 import { allDemoSignals, demoSlugsBelow } from "@/lib/demo/repos";
 import { score } from "@/lib/score/rubric";
 
@@ -35,8 +39,14 @@ const LIVE_SEED_REPOS = [
 export const SEED_REPOS: ReadonlyArray<{ owner: string; name: string }> =
   DEMO_MODE ? demoSlugsBelow(MIN_STARS) : LIVE_SEED_REPOS;
 
+/** A leaderboard row plus the score sequence behind it. */
+export interface TrendingRow extends TrendingRepo {
+  /** Oldest first. Empty when there is no history worth drawing. */
+  trend: number[];
+}
+
 export interface TrendingView {
-  repos: TrendingRepo[];
+  repos: TrendingRow[];
   /** True when the caller should render the seed suggestions instead. */
   seeded: boolean;
 }
@@ -56,10 +66,38 @@ export async function getTrending(limit: number): Promise<TrendingView> {
       rubricVersion: RUBRIC_VERSION,
     });
 
-    return { repos, seeded: repos.length < MIN_ROWS_BEFORE_SEEDING };
+    return {
+      repos: await withTrends(repos),
+      seeded: repos.length < MIN_ROWS_BEFORE_SEEDING,
+    };
   } catch (cause) {
     console.error("[trending] query failed; falling back to seeds", cause);
     return { repos: [], seeded: true };
+  }
+}
+
+/**
+ * Attaches each row's score sequence in one query for the whole page.
+ *
+ * Failing softly on its own: the board is the page, the trend lines are
+ * decoration on it, and a history query that falls over should cost the
+ * decoration rather than the leaderboard. The outer catch would have degraded
+ * the whole thing to the seed list.
+ */
+async function withTrends(repos: TrendingRepo[]): Promise<TrendingRow[]> {
+  try {
+    const trends = await findScoreTrends(
+      repos.map((repo) => repo.repoId),
+      { rubricVersion: RUBRIC_VERSION },
+    );
+
+    return repos.map((repo) => ({
+      ...repo,
+      trend: trends.get(repo.repoId) ?? [],
+    }));
+  } catch (cause) {
+    console.error("[trending] trend query failed; hiding the lines", cause);
+    return repos.map((repo) => ({ ...repo, trend: [] }));
   }
 }
 
@@ -71,7 +109,7 @@ export async function getTrending(limit: number): Promise<TrendingView> {
 function demoTrending(limit: number): TrendingView {
   const now = new Date();
 
-  const repos: TrendingRepo[] = allDemoSignals(now)
+  const repos: TrendingRow[] = allDemoSignals(now)
     .filter((signals) => signals.stars >= MIN_STARS)
     .map((signals) => {
       const result = score(signals, now);
@@ -81,6 +119,12 @@ function demoTrending(limit: number): TrendingView {
         stars: signals.stars,
         total: result.total,
         grade: result.grade,
+        // No database in demo mode, so no row id. The GitHub id is a stable
+        // stand-in for React's key; nothing queries it.
+        repoId: signals.githubId,
+        // Fixtures have one canned score and no history. Drawing a line
+        // through it would invent a trend the demo cannot have.
+        trend: [],
       };
     })
     .sort((a, b) => b.total - a.total || b.stars - a.stars)

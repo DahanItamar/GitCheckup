@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { SCORE_HISTORY_DAYS } from "@/lib/config";
 import type { Grade, ScoreResult } from "@/lib/score/types";
@@ -309,6 +309,54 @@ export interface TrendingRepo {
   stars: number;
   total: number;
   grade: Grade;
+  /** Exposed so the caller can fetch every row's trend in one query. */
+  repoId: number;
+}
+
+/**
+ * The score sequence for several repos at once, keyed by repo id.
+ *
+ * One query for the whole leaderboard. Asking per row would be twenty round
+ * trips to draw twenty decorations, on a page whose entire job is a list.
+ *
+ * Returns totals only — the row sparkline plots shape, not dates, and sending
+ * timestamps to render a 56-pixel line would be payload nobody reads.
+ */
+export async function findScoreTrends(
+  repoIds: number[],
+  options: { rubricVersion: number; now?: Date },
+): Promise<Map<number, number[]>> {
+  const trends = new Map<number, number[]>();
+  if (repoIds.length === 0) return trends;
+
+  const now = options.now ?? new Date();
+  const since = new Date(
+    now.getTime() - SCORE_HISTORY_DAYS * 24 * 60 * 60 * 1000,
+  );
+
+  const rows = await db
+    .select({
+      repoId: scores.repoId,
+      total: scores.total,
+      firstSeenAt: scores.firstSeenAt,
+    })
+    .from(scores)
+    .where(
+      and(
+        inArray(scores.repoId, repoIds),
+        eq(scores.rubricVersion, options.rubricVersion),
+        gte(scores.firstSeenAt, since),
+      ),
+    )
+    .orderBy(scores.repoId, scores.firstSeenAt);
+
+  for (const row of rows) {
+    const existing = trends.get(row.repoId);
+    if (existing) existing.push(row.total);
+    else trends.set(row.repoId, [row.total]);
+  }
+
+  return trends;
 }
 
 /**
@@ -360,6 +408,9 @@ export async function findTrending(options: {
       stars: latest.stars,
       total: latest.total,
       grade: latest.grade,
+      // Carried out so the caller can fetch every row's trend in one query
+      // rather than one per row.
+      repoId: latest.repoId,
     })
     .from(latest)
     .orderBy(desc(latest.total), desc(latest.stars))

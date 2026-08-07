@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { ScoreSparkline, type SparkPoint } from "./ScoreSparkline";
+import {
+  ScoreSparkline,
+  ScoreTrendLine,
+  type SparkPoint,
+} from "./ScoreSparkline";
 
 /**
  * The sparkline's judgement calls, rendered to static markup.
@@ -114,5 +118,42 @@ describe("what it says in words", () => {
 
   it("describes itself for assistive tech", () => {
     expect(render(series(61, 74))).toContain('aria-label="Score over the last');
+  });
+});
+
+describe("ScoreTrendLine (the leaderboard row)", () => {
+  const row = (...totals: number[]) =>
+    renderToStaticMarkup(<ScoreTrendLine totals={totals} grade="B" />);
+
+  it("draws nothing without at least two points", () => {
+    expect(row(70)).toBe("");
+    expect(row()).toBe("");
+  });
+
+  it("carries no labels, marker or table — the row prints the score", () => {
+    const markup = row(61, 68, 74);
+
+    expect(markup).toContain("<polyline");
+    expect(markup).not.toContain("<circle");
+    expect(markup).not.toContain("figcaption");
+    expect(markup).not.toContain("sr-only");
+  });
+
+  it("names the direction for assistive tech", () => {
+    expect(row(61, 74)).toContain("Trend rising");
+    expect(row(74, 61)).toContain("Trend falling");
+    expect(row(70, 70)).toContain("Trend unchanged");
+  });
+
+  it("stays inside its 52x16 box", () => {
+    const points = /points="([^"]+)"/.exec(row(0, 100, 20, 90))?.[1] ?? "";
+
+    for (const pair of points.split(" ").filter(Boolean)) {
+      const [x, y] = pair.split(",").map(Number);
+      expect(x!).toBeGreaterThanOrEqual(0);
+      expect(x!).toBeLessThanOrEqual(52);
+      expect(y!).toBeGreaterThanOrEqual(0);
+      expect(y!).toBeLessThanOrEqual(16);
+    }
   });
 });
