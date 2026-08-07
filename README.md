@@ -31,22 +31,23 @@ purpose.
 breakdown, ranked fixes, a downloadable fix plan, a share card, a badge, and a
 leaderboard.
 
-**338 tests, and the database half is covered too.** The migrations and every
+**351 tests, and the database half is covered too.** The migrations and every
 query run against real Postgres in CI — [PGlite](https://pglite.dev), which is
 Postgres compiled to WebAssembly, so `DISTINCT ON`, `jsonb`, `ON CONFLICT` and
 the CHECK constraints behave exactly as they will in production. No credentials
 needed, which is why it runs on every commit.
 
-What is still unproven is deployment: the Neon HTTP driver specifically, and a
-real README embed through GitHub's Camo proxy.
+It is **live at [gitcheckup.com](https://gitcheckup.com)** — self-hosted behind
+Cloudflare, scoring against a real GitHub token and a real Postgres. The badge
+at the top of this file is the deployment scoring itself.
 
-| Milestone | What it adds                                   | State                                    |
-| --------- | ---------------------------------------------- | ---------------------------------------- |
-| M1        | A real score, live                             | ✅ done                                  |
-| M2        | Neon cache, `/api/score`, instant repeat views | ✅ done (needs a Neon URL to run)        |
-| M3        | OG share card, README embed snippets           | ✅ done                                  |
-| M4        | Rate limiting, `/trending`, SVG badge          | ✅ done                                  |
-| M5        | LICENSE, CI, dogfooding                        | ✅ done (dogfooding needs a public repo) |
+| Milestone | What it adds                                   | State                                 |
+| --------- | ---------------------------------------------- | ------------------------------------- |
+| M1        | A real score, live                             | ✅ done                               |
+| M2        | Neon cache, `/api/score`, instant repeat views | ✅ done, running against real Neon    |
+| M3        | OG share card, README embed snippets           | ✅ done                               |
+| M4        | Rate limiting, `/trending`, SVG badge          | ✅ done                               |
+| M5        | LICENSE, CI, dogfooding                        | ✅ done — it scores itself **85 (A)** |
 
 Full plan in [docs/SPEC.md](docs/SPEC.md).
 
