@@ -108,10 +108,13 @@ describe("sweepScoreHistory", () => {
   });
 
   it("drops superseded rows past the window", async () => {
+    // Offsets are multiples of the window, not literal days: the retention
+    // constant is meant to be tuned, and a test pinned to "100 days ago" turns
+    // a deliberate change into a red build for no reason.
     const repoId = await seedRepo(2, "busy");
-    await seedScore(repoId, daysAgo(400), 40);
-    await seedScore(repoId, daysAgo(200), 50);
-    await seedScore(repoId, daysAgo(100), 60);
+    await seedScore(repoId, daysAgo(SCORE_HISTORY_DAYS * 4), 40);
+    await seedScore(repoId, daysAgo(SCORE_HISTORY_DAYS * 3), 50);
+    await seedScore(repoId, daysAgo(SCORE_HISTORY_DAYS * 2), 60);
     await seedScore(repoId, daysAgo(1), 70);
 
     await sweepScoreHistory(NOW);

@@ -15,6 +15,13 @@
       "when": 1786094779480,
       "tag": "0001_rate_limit_hits",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786127323821,
+      "tag": "0002_hesitant_earthquake",
+      "breakpoints": true
     }
   ]
 }

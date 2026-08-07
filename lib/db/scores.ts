@@ -77,6 +77,58 @@ export async function findLatestScore(slug: {
   };
 }
 
+/** One point on the sparkline: a score, and the day it first read that way. */
+export interface ScorePoint {
+  total: number;
+  grade: Grade;
+  firstSeenAt: Date;
+  /** When it was last confirmed. Equals `firstSeenAt` until a rescan agrees. */
+  fetchedAt: Date;
+}
+
+/**
+ * A repo's score over time, oldest first.
+ *
+ * Ordered and dated by `first_seen_at`, not `fetched_at`. The two diverge the
+ * moment a rescan confirms an unchanged score: `fetched_at` jumps to today
+ * while the score has in fact been unchanged for months. Plotting the former
+ * would draw every stable repository as a vertical cluster at "now".
+ *
+ * Bounded by the same window the sweep enforces, so this can never return rows
+ * the sweep has already promised to delete.
+ */
+export async function findScoreHistory(
+  slug: { owner: string; name: string },
+  options: { rubricVersion: number; now?: Date },
+): Promise<ScorePoint[]> {
+  const now = options.now ?? new Date();
+  const since = new Date(
+    now.getTime() - SCORE_HISTORY_DAYS * 24 * 60 * 60 * 1000,
+  );
+
+  const rows = await db
+    .select({
+      total: scores.total,
+      grade: scores.grade,
+      firstSeenAt: scores.firstSeenAt,
+      fetchedAt: scores.fetchedAt,
+    })
+    .from(scores)
+    .innerJoin(repos, eq(scores.repoId, repos.id))
+    .where(
+      and(
+        matchesSlug(slug),
+        // Mixing rubric versions on one line would draw a cliff where the
+        // weights changed, not where the repository did (SPEC §8).
+        eq(scores.rubricVersion, options.rubricVersion),
+        gte(scores.firstSeenAt, since),
+      ),
+    )
+    .orderBy(scores.firstSeenAt);
+
+  return rows;
+}
+
 /**
  * Upserts the repo, then either touches the newest score row or appends one.
  *

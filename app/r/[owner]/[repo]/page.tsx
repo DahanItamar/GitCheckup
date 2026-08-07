@@ -9,11 +9,16 @@ import { RepoError } from "@/components/RepoError";
 import { RepoInput } from "@/components/RepoInput";
 import { RetryButton } from "@/components/RetryButton";
 import { ScoreDial } from "@/components/ScoreDial";
+import { ScoreSparkline } from "@/components/ScoreSparkline";
 import { TipList } from "@/components/TipList";
 import { clientIpFrom } from "@/lib/client-ip";
 import { DEMO_MODE, SITE_URL } from "@/lib/config";
 import { isRepoGaugeError } from "@/lib/errors";
 import { parseRepoSlug } from "@/lib/repo-slug";
+import {
+  getScoreHistory,
+  type ScoreHistoryView,
+} from "@/lib/services/score-history";
 import { getOrComputeScore, type ScoredRepo } from "@/lib/services/score-repo";
 
 import { RescoreButton } from "./RescoreButton";
@@ -95,10 +100,20 @@ export default async function ResultPage({ params }: RouteParams) {
     throw error;
   }
 
-  return <Result result={result} />;
+  // After the score, and never blocking it: the trend is decoration on a page
+  // whose subject is the current number.
+  const history = await getScoreHistory(slug);
+
+  return <Result result={result} history={history} />;
 }
 
-function Result({ result }: { result: ScoredRepo }) {
+function Result({
+  result,
+  history,
+}: {
+  result: ScoredRepo;
+  history: ScoreHistoryView;
+}) {
   const { repo, score } = result;
   const githubUrl = `https://github.com/${repo.owner}/${repo.name}`;
 
@@ -131,6 +146,11 @@ function Result({ result }: { result: ScoredRepo }) {
 
         <div className="shrink-0 self-center">
           <ScoreDial total={score.total} grade={score.grade} />
+          <ScoreSparkline
+            points={history.points}
+            grade={score.grade}
+            windowDays={history.windowDays}
+          />
         </div>
       </header>
 

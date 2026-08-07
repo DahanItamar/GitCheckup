@@ -152,12 +152,19 @@ export const COLD_SCORES_PER_HOUR = 30;
  * repo viewed continuously accrued four rows a day — about 3 MB a year, per
  * repo, forever.
  *
- * 30 days covers the 7-day `/trending` window with a wide margin and leaves a
- * month of history for a score-over-time view, should one ever be built. The
- * newest row for a repo is never swept, whatever its age, so this bounds
+ * 180 days, because rows now accrue only when a score *changes* — an identical
+ * rescan touches the existing row instead of appending. That made the window
+ * cheap: measured on PGlite at ~2.2 KB per row, six months of a repo whose
+ * score moves weekly is ~55 KB, and even the pathological case of a score
+ * changing every 6 hours fits roughly 500 repositories in a 500 MB tier.
+ *
+ * Six months is also the shortest window where the sparkline says something. A
+ * repo that improves once a quarter draws a flat line over 30 days.
+ *
+ * The newest row for a repo is never swept, whatever its age, so this bounds
  * growth without ever costing a cache hit.
  */
-export const SCORE_HISTORY_DAYS = 30;
+export const SCORE_HISTORY_DAYS = 180;
 
 /**
  * The rubric weights this build produces. Bumped in the same commit as any

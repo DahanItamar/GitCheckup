@@ -74,7 +74,26 @@ export const scores = pgTable(
     /** Bumped whenever rubric weights change; older rows are cache misses. */
     rubricVersion: smallint("rubric_version").notNull(),
 
+    /**
+     * When this score was last *confirmed*, not when it was first reached.
+     *
+     * A rescan that finds nothing changed moves this forward on the existing
+     * row rather than appending a duplicate, so this is the freshness the TTL
+     * judges — and it is deliberately not the date the sparkline plots.
+     */
     fetchedAt: timestamp("fetched_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+
+    /**
+     * When this score was first observed. Never moves.
+     *
+     * The pair is what makes a trend chart honest: `fetched_at` alone said a
+     * score reached six months ago had been reached today, because confirming
+     * it dragged the only timestamp forward. The sparkline plots this one, so
+     * a flat stretch means "unchanged since", not "only just measured".
+     */
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },

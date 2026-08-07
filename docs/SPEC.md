@@ -422,6 +422,8 @@ Reference points: 10★ → 2, 100★ → 4, 1k★ → 7, 10k★ → 9, 100k★ 
 
 ### Database schema (`lib/db/schema.ts` → `drizzle/`)
 
+**[M5] `scores` carries two timestamps, and they are not interchangeable.** `fetched_at` is when a score was last _confirmed_; `first_seen_at` is when it was first _reached_, and never moves. An unchanged rescan drags the former forward and leaves the latter alone. The sparkline plots `first_seen_at`, because plotting `fetched_at` would draw every stable repository as a vertical cluster at "now" — a score reached in March would claim to have been reached today. `drizzle/0002` adds the column with `default now()`; there was no production data to backfill, since the app had never run against a real database when it landed.
+
 ```sql
 CREATE TABLE repos (
   id             BIGSERIAL PRIMARY KEY,
@@ -576,7 +578,7 @@ Both are properties of the tip provider, not the rubric — the points are still
    - **Stale** (older than 6h, newer than 7d, current rubric version) → return it immediately with `stale: true`, and schedule a refresh with Next's `after()` so the user waits on nothing.
    - **Missing, expired past 7d, or written by an older `rubric_version`** → check the rate limit, then fetch and score synchronously.
 6. On a cold path: `lib/github/signals.ts` issues the six parallel calls, `lib/score/rubric.ts` scores the result, `lib/tips/` generates tips, and `lib/db/scores.ts` upserts `repos` and inserts a `scores` row.
-7. The page renders the dial, the five-category breakdown, the tips, and the embed snippets. `generateMetadata` sets `og:image` to `{SITE_URL}/api/og?repo={owner}/{name}`.
+7. The page renders the dial, the sparkline beneath it, the five-category breakdown, the tips, and the embed snippets. `generateMetadata` sets `og:image` to `{SITE_URL}/api/og?repo={owner}/{name}`.
 
 **Failure branches:** repo doesn't exist or is private → `error.tsx` shows "We couldn't find that repo. RepoGauge only reads public repositories." · rate limited → "Too many new repos scored from your network. Try again in a few minutes." with the `Retry-After` value · GitHub down → if any score exists in the DB regardless of age, serve it with a "scored {n} days ago" notice rather than failing.
 
@@ -880,9 +882,15 @@ Numbered so any one can be rejected without reopening the rest.
    - **The old GitHub slug still resolves.** GitHub permanently redirects `repogauge` → `RepoGauge`, so anything already linking to the old URL keeps working.
 
 2. **A single server-side PAT serves all users; there is no per-user token entry.** Rejecting this adds an optional "paste your own token" field and a whole trust conversation about handling someone else's credential — a meaningfully different product.
-3. **6-hour score TTL, 7-day stale ceiling, 6-hour CDN cache on images, 30-day score history.** Pure tuning constants in `lib/config.ts`; change freely.
+3. **6-hour score TTL, 7-day stale ceiling, 6-hour CDN cache on images, 180-day score history.** Pure tuning constants in `lib/config.ts`; change freely.
 
-   **[M5] The history window is what bounds the database.** `scores` is insert-only — the latest row wins and the older ones were never removed, so storage tracked score _events_ rather than repositories: a continuously-viewed repo added four rows a day, forever. `sweepScoreHistory` deletes rows that are both past `SCORE_HISTORY_DAYS` **and** not the newest for their repository. The second condition is the load-bearing one: age alone would eventually delete the only score a long-tail repo has, turning every later visit into a cold six-call fan-out — a cache that empties itself is worse than one that grows. Measured on PGlite over a simulated year (200 repos, 20 refreshed four times a day): **29,380 rows / 59.3 MB → 2,600 rows / 5.3 MB**, with all 200 repos still holding a current score. The second figure is a steady state rather than a slower slope — 200 latest rows plus 30 days of history for the active ones — so growth is bounded by traffic shape instead of by uptime. Swept on ~1% of writes like the rate-limit counter, because §3 says not to add a cron without a measured problem.
+   **[M5] Two changes bound the database, and the order matters.** `scores` is insert-only, and nothing removed superseded rows — so storage tracked score _events_ rather than repositories: a continuously-viewed repo added four rows a day, forever.
+
+   _First_, **identical rescans stopped writing rows.** `saveScore` moves the newest row's `fetched_at` forward when the recomputed score matches it exactly, and appends only when something differs. The comparison happens in Postgres because `jsonb` does not preserve key order — a `JSON.stringify` comparison against the inserted object never matches, which a test asserting "thirty identical rescans produce one row" caught producing thirty. It matters more since the rescore control lets one caller spend a 30-per-hour budget on a single repository.
+
+   _Second_, **`sweepScoreHistory` deletes rows that are both past `SCORE_HISTORY_DAYS` and not the newest for their repository.** The second condition is load-bearing: age alone would eventually delete the only score a long-tail repo has, turning every later visit into a cold six-call fan-out — a cache that empties itself is worse than one that grows. Swept on ~1% of writes like the rate-limit counter, because §3 says not to add a cron without a measured problem.
+
+   Measured on PGlite over a simulated year (200 repos, 20 refreshed four times a day): **29,380 rows / 59.3 MB → 2,600 rows / 5.3 MB**, all 200 repos still holding a current score. That second figure is a steady state, not a slower slope, so growth is bounded by traffic shape rather than uptime. With duplicates gone the window became cheap enough to widen from 30 days to 180 — at ~2.2 KB per row, six months of a weekly-changing repo costs ~55 KB — and 180 is the shortest window where the sparkline says anything: a repo that improves once a quarter draws a flat line over 30 days.
 
 4. **30 cold scores per IP per hour.** A guess calibrated to "one enthusiastic human, not a script." Adjust after seeing real traffic.
 5. **The 50-star floor on `/trending`.** Lower it and the leaderboard becomes whatever was last pasted; raise it and the page stays empty longer.
