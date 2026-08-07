@@ -1,5 +1,7 @@
 # GitCheckup
 
+[![GitCheckup](https://gitcheckup.com/api/badge?repo=DahanItamar/GitCheckup)](https://gitcheckup.com/r/DahanItamar/GitCheckup)
+
 **Score any public GitHub repo out of 100 — in one paste, with zero permissions.**
 
 Deciding whether an unfamiliar repo is worth adopting means opening six tabs. Is
@@ -104,6 +106,24 @@ makes those hashes reversible. Generate one with
 `node -e "console.log(crypto.randomUUID())"`.
 
 ---
+
+## Put it in your README
+
+```markdown
+[![GitCheckup](https://gitcheckup.com/api/badge?repo=OWNER/REPO)](https://gitcheckup.com/r/OWNER/REPO)
+```
+
+The badge at the top of this file is that snippet, pointed at this repository —
+so it is also the live proof the endpoint works.
+
+**It refreshes on its own, but slowly, and deliberately so.** GitHub's Camo
+proxy fetches the image on every view of every README that embeds one, and a
+badge that triggered a score would let long-tail embed traffic drain the
+5000/hr GitHub budget with nobody waiting on the result. So the badge only ever
+_reads_ the cache — it never causes a fetch (SPEC §7 Flow B). It picks up a new
+number once someone visits the repo's page, and once the six-hour image cache
+has rolled over. If you want it current immediately, open the result page and
+press **Rescore now**.
 
 ## How the score works
 
