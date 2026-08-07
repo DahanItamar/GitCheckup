@@ -40,10 +40,10 @@ export default async function Home() {
               Recently scored
             </h2>
             <Link
-              href="/trending"
+              href="/improved"
               className="text-xs text-muted transition-colors duration-150 hover:text-ink"
             >
-              See all →
+              Most improved →
             </Link>
           </div>
           <div className="mt-3">

@@ -624,6 +624,19 @@ Like `/api/og`, the route accepts only a slug and re-derives the score server-si
 
 The 50-star floor is deliberate: without it, the leaderboard is whatever anyone last pasted, including repos named to be seen on our homepage (§9).
 
+### [M5] Flow D′ — Most improved (`/improved`)
+
+1. `/improved` ranks by **gain**: the newest score in the window minus the oldest, per repo, biggest first.
+2. A repo needs **two scores inside the window** to appear. With one observation there is no "from" to subtract, and counting a first score as a gain from zero would put every newly-scored repo at the top.
+3. Declines and flat lines are excluded — the page reports improvement, not change.
+4. Bounded and ordered by `first_seen_at`, so a repo that merely got _looked at_ today cannot claim a months-old improvement was recent.
+
+**Why the rename.** Ranking by absolute score meant the board could only ever list the same enormous repositories: nothing about a 95 changes, and the repos most likely to move are the small ones with room to climb. That is a popularity contest wearing the word "trending". Movement is the one thing RepoGauge knows that GitHub does not, and "Most improved" sets the expectation the data can actually meet. `/trending` 308s to `/improved`, permanently — the old path is in the metadata of anything already shared.
+
+**Why the star floor drops to 10 rather than to zero.** §9 relies on the floor as the mitigation for a public surface anyone can push a repository onto, and it works by making an entry cost real stars. Keeping 50 here would rebuild the hall of giants this page exists to escape. 10 keeps a throwaway repository off the homepage while letting a genuinely small project on; it is the first number to raise if spam appears, and the 30-day window means anything unwanted ages off without intervention.
+
+**Rejected: ranking by lookups.** The obvious alternative — count how often a repo is viewed — is trivially gameable from one browser tab, and it would discard the property that makes this board defensible: rank comes from an objective rubric, so climbing it means actually adding a LICENSE or wiring up CI. It would also mean a database write per page view, against the whole point of the 6-hour TTL. Revisit only with real traffic to calibrate against, and never as the sole signal.
+
 ---
 
 ## 8. Edge Cases & Failure Modes
@@ -705,7 +718,7 @@ surprise.
 
 **Untrusted content in our own UI.** Repo names, descriptions, topics, and homepage URLs come from GitHub and are attacker-controlled by anyone who can create a repo. React escapes them on render; the rules that matter are: never `dangerouslySetInnerHTML`, and validate `homepage` parses as `http:`/`https:` before rendering it as an anchor (a `javascript:` homepage is a stored XSS otherwise).
 
-**`/trending` is a public surface someone can push content onto.** Anyone can score any repo, and a repo name is arbitrary text. Mitigations: the 50-star floor in Flow D means a repo created to appear there would first need 50 real stars; only `owner/name` and a number are rendered, never the description; and the query window is 7 days so anything unwanted ages off without intervention.
+**`/improved` (formerly `/trending`) is a public surface someone can push content onto.** Anyone can score any repo, and a repo name is arbitrary text. Mitigations: a star floor means a repo created to appear there needs real stars first — 50 on the landing strip's Flow D query, **10** on `/improved`, which trades some of that protection for the small repos the page exists to surface; only `owner/name` and a number are rendered, never the description; and the query window is 7 days so anything unwanted ages off without intervention.
 
 **Errors and logs.** Client-facing errors carry a code and a generic message. Upstream status codes, response bodies, and stack traces go to Vercel logs only. No request bodies are logged.
 

@@ -60,10 +60,10 @@ export default function RootLayout({
             </Link>
             <nav className="flex items-center gap-5 text-xs text-muted">
               <Link
-                href="/trending"
+                href="/improved"
                 className="transition-colors duration-150 hover:text-ink"
               >
-                Trending
+                Most improved
               </Link>
               <span className="text-faint">Public data only</span>
             </nav>

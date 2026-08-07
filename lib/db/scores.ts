@@ -359,6 +359,86 @@ export async function findScoreTrends(
   return trends;
 }
 
+/** A repo that gained points inside the window, and by how many. */
+export interface ImprovedRepo {
+  owner: string;
+  name: string;
+  stars: number;
+  /** Where it stands now. */
+  total: number;
+  grade: Grade;
+  /** Where it stood when the window opened. */
+  from: number;
+  /** `total - from`, always positive — a decline is not an improvement. */
+  delta: number;
+  repoId: number;
+}
+
+/**
+ * Flow D′: the biggest score gains inside a window, ranked by gain.
+ *
+ * The leaderboard ranked by absolute score could only ever show the same
+ * handful of enormous repositories, because nothing about a 95 changes. This
+ * ranks by movement, which is the one thing RepoGauge knows and GitHub does
+ * not — and a repo going 54 → 71 has done more work than one sitting at 95.
+ *
+ * Requires two scores in the window, so a repo scored once cannot appear: with
+ * a single observation there is no "from" to subtract, and treating its first
+ * score as a gain from zero would put every newly-scored repo at the top.
+ *
+ * `first_seen_at` is what bounds and orders the window — see the note on that
+ * column. Using `fetched_at` would let a repo that merely got *looked at*
+ * today claim its months-old improvement was recent.
+ */
+export async function findMostImproved(options: {
+  limit: number;
+  windowDays: number;
+  minStars: number;
+  rubricVersion: number;
+  now?: Date;
+}): Promise<ImprovedRepo[]> {
+  const now = options.now ?? new Date();
+  const since = new Date(
+    now.getTime() - options.windowDays * 24 * 60 * 60 * 1000,
+  );
+
+  const result = await db.execute(sql`
+    select r.owner, r.name, r.stars, w.repo_id,
+           w.latest_total, w.latest_grade, w.earliest_total,
+           (w.latest_total - w.earliest_total) as delta
+      from (
+        select repo_id,
+               (array_agg(total order by first_seen_at desc, id desc))[1] as latest_total,
+               (array_agg(grade order by first_seen_at desc, id desc))[1] as latest_grade,
+               (array_agg(total order by first_seen_at asc,  id asc))[1]  as earliest_total
+          from ${scores}
+         where ${scores.rubricVersion} = ${options.rubricVersion}
+           and ${scores.firstSeenAt} >= ${since}
+         group by repo_id
+        having count(*) >= 2
+      ) w
+      join ${repos} r on r.id = w.repo_id
+     where r.stars >= ${options.minStars}
+       and w.latest_total > w.earliest_total
+     order by delta desc, w.latest_total desc, r.stars desc
+     limit ${options.limit}
+  `);
+
+  return rowsOf(result).map((row) => {
+    const r = row as Record<string, unknown>;
+    return {
+      owner: String(r.owner),
+      name: String(r.name),
+      stars: Number(r.stars),
+      total: Number(r.latest_total),
+      grade: String(r.latest_grade) as Grade,
+      from: Number(r.earliest_total),
+      delta: Number(r.delta),
+      repoId: Number(r.repo_id),
+    };
+  });
+}
+
 /**
  * Flow D: the latest score per repo inside a recent window, ranked.
  *

@@ -144,6 +144,24 @@ export const IMAGE_CACHE_SECONDS = 6 * 60 * 60;
 /** Cold scores permitted per IP per hour (SPEC §11 assumption 4). */
 export const COLD_SCORES_PER_HOUR = 30;
 
+/** How far back `/improved` looks for a gain. */
+export const IMPROVED_WINDOW_DAYS = 30;
+
+/**
+ * The star floor on `/improved`, deliberately far below `/trending`'s 50.
+ *
+ * That floor is not a quality bar — it is the §9 mitigation for a public
+ * surface anyone can push a repository onto, and it works by making an entry
+ * cost 50 real stars. A board about *movement* cannot keep it: excluding
+ * everything small would rebuild the hall of giants this page exists to
+ * escape, since a repo at 95 has nowhere to climb.
+ *
+ * 10 keeps a throwaway repository off the homepage while letting a genuinely
+ * small project on. It is the first number to raise if spam ever appears, and
+ * the window means anything unwanted ages off without intervention.
+ */
+export const IMPROVED_MIN_STARS = 10;
+
 /**
  * How long superseded score rows are kept.
  *
