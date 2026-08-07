@@ -9,10 +9,11 @@ green, nothing pushed — the repository is still private.
 
 ## In one line
 
-All five milestones are built and tested; **the app has never run against a
-real GitHub token or a real database**, so every remaining task needs
-credentials or a deployment. `DEMO_MODE=1` shows you the interface without
-either, but closes none of those gaps.
+All five milestones are built, and the app now **runs on real infrastructure**:
+a live GitHub token, a live Neon database, and a container on `srv1`
+(`<origin address, not published>`) behind nginx. It is deliberately **not yet public** — bound
+to loopback with no vhost — because it has no domain. That is the only
+remaining blocker.
 
 ---
 
@@ -105,12 +106,45 @@ Two judgement calls worth revisiting if you disagree:
 
 ## What is not proven
 
-| Gap                                        | Why it is still open                                                                                              | Closes when               |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| The `@neondatabase/serverless` HTTP driver | PGlite proves the SQL is correct, not that Neon's driver speaks it identically                                    | First real `DATABASE_URL` |
-| Live end-to-end with a real token          | Every live check used the unauthenticated API                                                                     | First real `GITHUB_TOKEN` |
-| README embed through GitHub's Camo proxy   | Needs a public URL — a `DEMO_MODE=1` deployment is enough, since Camo cannot tell a fixture score from a real one | First deployment          |
-| RepoGauge scoring itself                   | The product reads public repos only, and this repo is **private**                                                 | Repo made public          |
+| Gap                                            | Why it is still open                                                                                              | Closes when      |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------- |
+| ~~The `@neondatabase/serverless` HTTP driver~~ | **Closed.** Migrations applied and every query ran against real Neon, including the three raw-SQL paths           | —                |
+| ~~Live end-to-end with a real token~~          | **Closed.** Cold score 1.63s, cache hit 0.064s, against the live API                                              | —                |
+| The Docker image build                         | The image builds and runs on `srv1`; it has never been rebuilt from scratch on a clean host                       | Next deploy      |
+| Anything behind a real domain                  | No vhost, no certificate, no Camo check yet                                                                       | A domain         |
+| README embed through GitHub's Camo proxy       | Needs a public URL — a `DEMO_MODE=1` deployment is enough, since Camo cannot tell a fixture score from a real one | First deployment |
+| RepoGauge scoring itself                       | The product reads public repos only, and this repo is **private**                                                 | Repo made public |
+
+---
+
+## Where it runs
+
+|                |                                                                      |
+| -------------- | -------------------------------------------------------------------- |
+| Host           | `srv1` — `<origin address, not published>`, Ubuntu 26.04, nginx + certbot at the edge |
+| Container      | `repogauge:latest`, `127.0.0.1:3000`, `restart: unless-stopped`      |
+| Source on host | `/opt/repogauge` (matches the `/opt/hewordle` convention)            |
+| Secrets        | `/opt/repogauge/.env.production`, mode 600, never in git             |
+| Database       | Neon, EU Central                                                     |
+
+Rebuild and restart:
+
+```bash
+ssh srv1 'cd /opt/repogauge && docker build -t repogauge:latest .   && docker rm -f repogauge   && docker run -d --name repogauge --restart unless-stopped        -p 127.0.0.1:3000:3000 --env-file /opt/repogauge/.env.production repogauge:latest'
+```
+
+**Two traps for whoever wires the vhost.**
+
+_Do not_ `include snippets/security-headers.conf` in the RepoGauge vhost. Its
+CSP sets `script-src 'self'` with no `'unsafe-inline'`; browsers enforce the
+intersection of multiple CSP headers, so it would override the app's own,
+block Next's inline hydration script, and leave a page that returns 200 and
+does nothing. The app ships its own headers — see `next.config.ts`.
+
+`TRUSTED_CLIENT_IP_HEADER` is `x-real-ip`, because nginx is the edge and sets
+it from `$remote_addr`. If Cloudflare proxying is ever switched on it **must**
+become `cf-connecting-ip`, or the per-IP rate limit is bypassable by sending
+your own `X-Forwarded-For`.
 
 ---
 
