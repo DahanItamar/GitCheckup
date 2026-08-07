@@ -9,6 +9,16 @@ export type GitHubErrorCode =
   | "NOT_FOUND"
   /** Our 5000/hr budget is spent. Distinct from NOT_FOUND: retry later works. */
   | "RATE_LIMITED"
+  /**
+   * GitHub rejected our credential — expired, revoked, or mistyped.
+   *
+   * Separate from UNAVAILABLE because it is the one failure here that is not
+   * GitHub's: nothing is down, waiting does not help, and only the operator
+   * can fix it. Folding it into UNAVAILABLE produced a site-wide "GitHub isn't
+   * answering, this usually clears within an hour" that was wrong on both
+   * counts and never cleared.
+   */
+  | "UNAUTHORIZED"
   /** Timed out, network failure, 5xx, or a body we could not parse. */
   | "UNAVAILABLE";
 

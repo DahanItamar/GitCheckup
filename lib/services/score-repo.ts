@@ -180,7 +180,16 @@ function degradeOrThrow(
   fallback: CachedScore | null,
 ): ScoredRepo {
   if (fallback !== null) {
-    console.error("[score-repo] serving a stale score; GitHub failed", cause);
+    // Name the credential explicitly. "GitHub failed" is true of an outage,
+    // which ends on its own; a rejected token does not, and this branch is
+    // exactly where that difference hides — the site keeps answering from
+    // cache and looks healthy.
+    console.error(
+      cause instanceof GitHubError && cause.code === "UNAUTHORIZED"
+        ? "[score-repo] serving a stale score; GITHUB_TOKEN was rejected"
+        : "[score-repo] serving a stale score; GitHub failed",
+      cause,
+    );
     return serve(fallback, { stale: true });
   }
   throw toRepoGaugeError(cause);
@@ -248,5 +257,10 @@ function toRepoGaugeError(cause: unknown): RepoGaugeError {
 
   // A spent GitHub budget is our problem, not the caller's: RATE_LIMITED is
   // reserved for a caller who exceeded *our* per-IP limit (SPEC §8).
+  //
+  // UNAUTHORIZED lands here too, and deliberately keeps the same copy. The
+  // visitor cannot act on our expired token, and telling them the operator
+  // misconfigured the site would be honest but useless. The distinction is
+  // preserved in `cause` and shouted in the log, where it can be acted on.
   return new RepoGaugeError("UPSTREAM_UNAVAILABLE", { cause });
 }

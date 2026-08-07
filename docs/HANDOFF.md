@@ -2,7 +2,7 @@
 
 Where RepoGauge stands, what is proven, and what to do next. Written at commit
 `0fa8233` on `main`, after the M5 follow-up session: demo mode, the fix plan,
-the interface pass, and a test for the GitHub client. 265 tests, all gates
+the interface pass, and a test for the GitHub client. 269 tests, all gates
 green, nothing pushed — the repository is still private.
 
 ---

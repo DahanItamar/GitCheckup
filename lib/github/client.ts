@@ -90,6 +90,23 @@ function errorForResponse(response: Response, path: string): GitHubError {
     });
   }
 
+  if (response.status === 401) {
+    // Logged here, not where it is finally handled: with a warm cache the
+    // service degrades to stale scores and never reaches the error mapping,
+    // so the deployment would run indefinitely on frozen data with nothing in
+    // the log naming the cause. Every call in the fan-out repeats this, which
+    // is the intended volume — a deployment in this state is broken.
+    console.error(
+      "[github] GITHUB_TOKEN was rejected (401). It is expired, revoked, or " +
+        "mistyped. Scores will degrade to cached data until it is replaced. " +
+        "Nothing is wrong with GitHub.",
+    );
+
+    return new GitHubError("UNAUTHORIZED", "GitHub rejected the token", {
+      status: 401,
+    });
+  }
+
   if (isRateLimited(response)) {
     return new GitHubError("RATE_LIMITED", "GitHub rate limit exhausted", {
       status: response.status,

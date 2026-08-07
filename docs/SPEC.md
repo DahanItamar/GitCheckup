@@ -489,6 +489,8 @@ Six calls, issued in parallel via `Promise.allSettled`, 5-second timeout each vi
 
 **[M1] Call #2 under-reports templates.** `/community/profile` returns `issue_template: null` when a repo uses the directory form (`.github/ISSUE_TEMPLATE/`) rather than a single file — `vercel/next.js` is one such repo. `hasIssueOrPrTemplate` therefore also checks the call #5 listing for an `issue_template`/`pull_request_template` entry. Verified against the live API; costs no extra call.
 
+**[M5] A rejected token is not an outage.** `401` maps to its own `UNAUTHORIZED` code rather than to `UNAVAILABLE`, and `lib/github/client.ts` logs it by name at the point of detection. The visitor still sees the `UPSTREAM_UNAVAILABLE` copy — they cannot act on an expired PAT — but the operator gets a line that says which of the two it is. It is logged in the client rather than where it is finally handled because with a warm cache the service degrades to stale scores and never reaches the error mapping: the site keeps answering, looks healthy, and serves frozen data indefinitely. This is the failure mode a token expiry produces, and it is the one worth being loud about.
+
 Only call #1 is fatal. Any other rejection degrades that signal to its "absent" value and the score still returns — a partial score beats an error page. Every request sends `Authorization: Bearer ${GITHUB_TOKEN}`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, and a `User-Agent` identifying RepoGauge.
 
 ### HTTP API — inbound

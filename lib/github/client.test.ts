@@ -197,6 +197,46 @@ describe("status → code", () => {
     );
   });
 
+  it("maps 401 to UNAUTHORIZED, not UNAVAILABLE", async () => {
+    // An expired token is the one failure here that is not GitHub's. Calling
+    // it UNAVAILABLE told every visitor "this usually clears within an hour"
+    // about a condition that never clears on its own.
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    fetchMock.mockResolvedValue(reply(401, { body: { message: "Bad creds" } }));
+
+    const error = await failureFrom(githubGet("/repos/a/b"));
+
+    expect(error.code).toBe("UNAUTHORIZED");
+    expect(error.status).toBe(401);
+    log.mockRestore();
+  });
+
+  it("names the token in the log, since only the operator can fix it", async () => {
+    // The log is the feature. With a warm cache the service degrades to stale
+    // scores and never reaches the error mapping, so this line is the only
+    // place the cause is stated.
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    fetchMock.mockResolvedValue(reply(401));
+
+    await githubGet("/repos/a/b").catch(() => undefined);
+
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(String(log.mock.calls[0]?.[0])).toContain("GITHUB_TOKEN");
+    log.mockRestore();
+  });
+
+  it("does not shout about the token for any other status", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    for (const status of [403, 404, 429, 500]) {
+      fetchMock.mockResolvedValue(reply(status));
+      await githubGet("/repos/a/b").catch(() => undefined);
+    }
+
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
   it("maps 5xx to UNAVAILABLE, keeping the status for the logs", async () => {
     fetchMock.mockResolvedValue(reply(503));
 
