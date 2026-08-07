@@ -33,15 +33,28 @@ const GRADE_HEX: Record<Grade, string> = {
 };
 
 /**
- * The card is drawn on its own dark ground rather than the reader's, so its
- * palette is fixed rather than inherited. These are the same five grade hues
- * the app uses, stepped for a #1b1f24 surface.
+ * The card draws on its own ground rather than the reader's, so its palette is
+ * fixed rather than inherited -- and it can be far more saturated than
+ * `GRADE_HEX`, which has to stay legible on a white README too. These are the
+ * same five hues at the brightness a near-black surface allows.
  */
-const CARD_BG = "#161a1f";
-const CARD_BG_TOP = "#21262d";
-const CARD_EDGE = "#30363d";
-const CARD_LABEL = "#8b949e";
-const CARD_MUTED = "#6e7681";
+const CARD_BG = "#090d16";
+const CARD_EDGE = "#1e293b";
+const CARD_RULE = "#334155";
+const CARD_LABEL = "#94a3b8";
+const CARD_MUTED = "#64748b";
+const CARD_VALUE = "#f8fafc";
+const CARD_NEUTRAL = "#64748b";
+
+/** [accent, the lighter tint used for the letter inside the chip]. */
+const CARD_GRADE: Record<Grade, readonly [string, string]> = {
+  "A+": ["#22c55e", "#4ade80"],
+  A: ["#22c55e", "#4ade80"],
+  B: ["#84cc16", "#a3e635"],
+  C: ["#eab308", "#facc15"],
+  D: ["#f97316", "#fb923c"],
+  F: ["#ef4444", "#f87171"],
+};
 
 const LABEL = "gitcheckup";
 /** Shields' own label grey. Anything darker loses the contrast with the value. */
@@ -143,22 +156,6 @@ export function renderBadge({ message, color, style }: BadgeOptions): string {
  * The card style
  * ---------------------------------------------------------------------- */
 
-const CARD_HEIGHT = 56;
-const CARD_RADIUS = 8;
-const CARD_SPINE = 5;
-const CARD_PAD_L = 18;
-const CARD_PAD_R = 18;
-
-/** Baselines, chosen so the label's descender clears the score's cap height. */
-const CARD_LABEL_BASELINE = 21;
-const CARD_VALUE_BASELINE = 44;
-
-/** Score → grade, and grade → the muted "/ 100". */
-const CARD_GRADE_GAP = 9;
-const CARD_SUFFIX_GAP = 18;
-
-const CARD_LETTER_SPACING = 1.3;
-
 /**
  * Rough Verdana advance width, as a fraction of font size.
  *
@@ -171,6 +168,83 @@ function advance(text: string, fontSize: number, factor = 0.62): number {
   return Math.ceil(text.length * fontSize * factor);
 }
 
+const CARD_HEIGHT = 38;
+const CARD_MID = CARD_HEIGHT / 2;
+const CARD_RADIUS = 8;
+const CARD_PAD = 13;
+
+const CARD_DOT_R = 4;
+/** Status dot -> label, label -> rule, rule -> score, score -> chip. */
+const CARD_DOT_GAP = 11;
+const CARD_RULE_GAP = 13;
+const CARD_CHIP_GAP = 8;
+
+const CARD_CHIP_H = 20;
+const CARD_CHIP_RX = 6;
+const CARD_CHIP_PAD = 9;
+
+const CARD_LETTER_SPACING = 1;
+
+const CARD_LABEL_SIZE = 11;
+const CARD_VALUE_SIZE = 15;
+const CARD_UNKNOWN_SIZE = 12;
+const CARD_GRADE_SIZE = 12;
+
+/** Advance factors: mono label, sans digits, sans caps, sans lowercase. */
+const CARD_LABEL_FACTOR = 0.6;
+const CARD_VALUE_FACTOR = 0.62;
+const CARD_GRADE_FACTOR = 0.68;
+
+const labelWidth =
+  advance(LABEL, CARD_LABEL_SIZE, CARD_LABEL_FACTOR) +
+  (LABEL.length - 1) * CARD_LETTER_SPACING;
+
+/** The left half never changes: the label is a constant. */
+const CARD_DOT_X = CARD_PAD + CARD_DOT_R;
+const CARD_RULE_X =
+  CARD_DOT_X + CARD_DOT_R + CARD_DOT_GAP + labelWidth + CARD_RULE_GAP;
+
+function chipWidth(grade: string): number {
+  // The chip hugs its letter, so `A+` is wider than `A`. Every other grade is
+  // one character, and so exactly as wide as every other.
+  return advance(grade, CARD_GRADE_SIZE, CARD_GRADE_FACTOR) + CARD_CHIP_PAD * 2;
+}
+
+/**
+ * One fixed size for every card, so two of them in a list line up.
+ *
+ * Derived from the widest thing that can appear rather than typed in: the
+ * three-digit score and the two-character grade together leave exactly
+ * `CARD_CHIP_GAP` between them, so a later change to a font size moves this
+ * number instead of silently overflowing the card. A test pins it.
+ */
+const CARD_WIDTH =
+  CARD_RULE_X +
+  1 +
+  CARD_RULE_GAP +
+  advance("100", CARD_VALUE_SIZE, CARD_VALUE_FACTOR) +
+  CARD_CHIP_GAP +
+  chipWidth("A+") +
+  CARD_PAD;
+
+const CARD_MONO =
+  "ui-monospace,SFMono-Regular,Menlo,Consolas,DejaVu Sans Mono,monospace";
+const CARD_SANS =
+  "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,DejaVu Sans,sans-serif";
+
+/**
+ * Cap height as a fraction of font size, near enough for both families here.
+ *
+ * Everything on the card sits on one optical line, but at three different
+ * sizes -- so the baselines cannot be equal. Centring each string's cap box
+ * on the card's midline is what makes them look aligned.
+ */
+const CAP_RATIO = 0.72;
+
+function baselineFor(fontSize: number): number {
+  return CARD_MID + (fontSize * CAP_RATIO) / 2;
+}
+
 interface CardText {
   x: number;
   baseline: number;
@@ -179,6 +253,7 @@ interface CardText {
   size: number;
   fill: string;
   bold?: boolean;
+  mono?: boolean;
 }
 
 /** One string on the card, at 10x and scaled back — same trick as `textPair`. */
@@ -190,16 +265,23 @@ function cardText({
   size,
   fill,
   bold,
+  mono,
 }: CardText): string {
-  const weight = bold === true ? ' font-weight="bold"' : "";
-  return `<text x="${x * 10}" y="${baseline * 10}" transform="scale(.1)" fill="${fill}" font-size="${size * 10}"${weight} textLength="${width * 10}">${text}</text>`;
+  const weight = bold === true ? ' font-weight="700"' : "";
+  const family = mono === true ? ` font-family="${CARD_MONO}"` : "";
+  const spacing =
+    mono === true ? ` letter-spacing="${CARD_LETTER_SPACING * 10}"` : "";
+  return `<text x="${x * 10}" y="${baseline * 10}" transform="scale(.1)" fill="${fill}" font-size="${size * 10}"${weight}${family}${spacing} textLength="${width * 10}">${text}</text>`;
 }
 
 interface CardOptions {
   /** `null` when the repo could not be scored — see `unknownBadge`. */
   score: number | null;
-  grade: string | null;
-  color: string;
+  grade: Grade | null;
+  /** The dot, the rule of the chip. */
+  accent: string;
+  /** The letter inside the chip — lighter, because it sits on a tinted fill. */
+  tint: string;
 }
 
 /**
@@ -215,76 +297,56 @@ interface CardOptions {
  * two-digit score and a one-letter grade — `100`, `A+` and `unknown` all
  * overflowed it.
  */
-function renderCard({ score, grade, color }: CardOptions): string {
-  // Uppercase on the card only. The accessible name below keeps its real
-  // casing — some screen readers spell all-caps strings out letter by letter.
-  const label = escapeXml(LABEL).toUpperCase();
+function renderCard({ score, grade, accent, tint }: CardOptions): string {
+  const scored = score !== null && grade !== null;
   const value = score === null ? "unknown" : String(score);
-  const suffix = score === null ? "" : "/ 100";
 
-  const labelSize = 10;
-  const valueSize = score === null ? 17 : 25;
-  const gradeSize = 15;
-  const suffixSize = 10;
+  const valueSize = scored ? CARD_VALUE_SIZE : CARD_UNKNOWN_SIZE;
+  const valueW = advance(
+    value,
+    valueSize,
+    scored ? CARD_VALUE_FACTOR : CARD_LABEL_FACTOR,
+  );
+  const gradeW =
+    grade === null ? 0 : advance(grade, CARD_GRADE_SIZE, CARD_GRADE_FACTOR);
+  const chipW = grade === null ? 0 : chipWidth(grade);
 
-  // Tracking is part of the label's advance, so `textLength` still lands where
-  // the layout below expects it to.
-  const labelW =
-    advance(label, labelSize, 0.68) + (label.length - 1) * CARD_LETTER_SPACING;
-  const valueW = advance(value, valueSize, score === null ? 0.6 : 0.64);
-  const gradeW = grade === null ? 0 : advance(grade, gradeSize, 0.76);
-  const suffixW = suffix === "" ? 0 : advance(suffix, suffixSize, 0.58);
+  // The score and the chip stay a tight group pinned to the right edge. Left-
+  // aligning the score off the rule would open a 30px hole before the chip on
+  // a single-digit score, which reads as a layout bug rather than a layout.
+  const chipX = CARD_WIDTH - CARD_PAD - chipW;
+  const valueX =
+    (grade === null ? CARD_WIDTH - CARD_PAD : chipX - CARD_CHIP_GAP) - valueW;
 
-  const gradeGap = grade === null ? 0 : CARD_GRADE_GAP;
-  const leftRun = valueW + gradeGap + gradeW;
-  const rightRun = suffixW === 0 ? 0 : CARD_SUFFIX_GAP + suffixW;
-  const content = Math.max(labelW, leftRun + rightRun);
-  const width = CARD_SPINE + CARD_PAD_L + content + CARD_PAD_R;
-
-  const x0 = CARD_SPINE + CARD_PAD_L;
   const id = `c${score ?? "u"}${grade ?? ""}`.replace(/\+/g, "p");
 
-  const gradeText =
+  // No grade, no chip. A hollow chip would read as a grade we failed to draw.
+  const chip =
     grade === null
       ? ""
-      : cardText({
-          x: x0 + valueW + gradeGap,
-          baseline: CARD_VALUE_BASELINE,
-          text: escapeXml(grade),
-          width: gradeW,
-          size: gradeSize,
-          fill: color,
-          bold: true,
-        });
+      : `<rect x="${chipX}" y="${(CARD_HEIGHT - CARD_CHIP_H) / 2}" width="${chipW}" height="${CARD_CHIP_H}" rx="${CARD_CHIP_RX}" fill="${accent}" fill-opacity=".18" stroke="${accent}"/>
+    ${cardText({
+      x: chipX + (chipW - gradeW) / 2,
+      baseline: baselineFor(CARD_GRADE_SIZE),
+      text: escapeXml(grade),
+      width: gradeW,
+      size: CARD_GRADE_SIZE,
+      fill: tint,
+      bold: true,
+    })}`;
 
-  const suffixText =
-    suffix === ""
-      ? ""
-      : cardText({
-          x: width - CARD_PAD_R - suffixW,
-          baseline: CARD_VALUE_BASELINE,
-          text: suffix,
-          width: suffixW,
-          size: suffixSize,
-          fill: CARD_MUTED,
-        });
+  const alt = `${LABEL}: ${escapeXml(value)}${grade === null ? "" : ` ${escapeXml(grade)}`}`;
 
-  const alt = `${escapeXml(LABEL)}: ${escapeXml(value)}${grade === null ? "" : ` ${escapeXml(grade)}`}`;
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${CARD_HEIGHT}" viewBox="0 0 ${width} ${CARD_HEIGHT}" role="img" aria-label="${alt}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" viewBox="0 0 ${CARD_WIDTH} ${CARD_HEIGHT}" role="img" aria-label="${alt}">
   <title>${alt}</title>
-  <linearGradient id="${id}g" x2="0" y2="100%"><stop offset="0" stop-color="${CARD_BG_TOP}"/><stop offset="1" stop-color="${CARD_BG}"/></linearGradient>
-  <clipPath id="${id}"><rect width="${width}" height="${CARD_HEIGHT}" rx="${CARD_RADIUS}" fill="#fff"/></clipPath>
-  <g clip-path="url(#${id})">
-    <rect width="${width}" height="${CARD_HEIGHT}" fill="url(#${id}g)"/>
-    <rect width="${CARD_SPINE}" height="${CARD_HEIGHT}" fill="${color}"/>
-  </g>
-  <rect x=".5" y=".5" width="${width - 1}" height="${CARD_HEIGHT - 1}" rx="${CARD_RADIUS - 0.5}" fill="none" stroke="${CARD_EDGE}"/>
-  <g text-anchor="start" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision">
-    ${cardText({ x: x0, baseline: CARD_LABEL_BASELINE, text: label, width: labelW, size: labelSize, fill: CARD_LABEL })}
-    ${cardText({ x: x0, baseline: CARD_VALUE_BASELINE, text: escapeXml(value), width: valueW, size: valueSize, fill: "#ffffff", bold: true })}
-    ${gradeText}
-    ${suffixText}
+  <filter id="${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.5" result="b"/><feComposite in="SourceGraphic" in2="b" operator="over"/></filter>
+  <rect x=".6" y=".6" width="${CARD_WIDTH - 1.2}" height="${CARD_HEIGHT - 1.2}" rx="${CARD_RADIUS}" fill="${CARD_BG}" stroke="${CARD_EDGE}" stroke-width="1.2"/>
+  <circle cx="${CARD_DOT_X}" cy="${CARD_MID}" r="${CARD_DOT_R}" fill="${accent}" filter="url(#${id})"/>
+  <line x1="${CARD_RULE_X}" y1="${CARD_MID - 8}" x2="${CARD_RULE_X}" y2="${CARD_MID + 8}" stroke="${CARD_RULE}"/>
+  <g text-anchor="start" font-family="${CARD_SANS}" text-rendering="geometricPrecision">
+    ${cardText({ x: CARD_DOT_X + CARD_DOT_R + CARD_DOT_GAP, baseline: baselineFor(CARD_LABEL_SIZE), text: LABEL, width: labelWidth, size: CARD_LABEL_SIZE, fill: CARD_LABEL, bold: true, mono: true })}
+    ${cardText({ x: valueX, baseline: baselineFor(valueSize), text: escapeXml(value), width: valueW, size: valueSize, fill: scored ? CARD_VALUE : CARD_MUTED, bold: scored })}
+    ${chip}
   </g>
 </svg>`;
 }
@@ -296,7 +358,8 @@ export function scoreBadge(
   style: BadgeStyle,
 ): string {
   if (style === "card") {
-    return renderCard({ score: total, grade, color: GRADE_HEX[grade] });
+    const [accent, tint] = CARD_GRADE[grade];
+    return renderCard({ score: total, grade, accent, tint });
   }
 
   return renderBadge({
@@ -311,7 +374,12 @@ export function unknownBadge(style: BadgeStyle): string {
   if (style === "card") {
     // No score and no grade: the card drops the number, the grade block and
     // the "/ 100" rather than printing a hero figure that does not exist.
-    return renderCard({ score: null, grade: null, color: "#6b7280" });
+    return renderCard({
+      score: null,
+      grade: null,
+      accent: CARD_NEUTRAL,
+      tint: CARD_NEUTRAL,
+    });
   }
 
   return renderBadge({ message: "unknown", color: "#6b7280", style });

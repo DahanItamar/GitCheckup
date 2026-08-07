@@ -113,6 +113,9 @@ describe("what makes it look right rather than merely correct", () => {
   });
 });
 
+/** The flat badge's green — the card must not reuse it. */
+const GRADE_HEX_A = "#2f855a";
+
 describe("the card style", () => {
   it("is opt-in — flat stays the default", () => {
     // The snippet is already in READMEs. Changing what the default renders
@@ -121,48 +124,89 @@ describe("the card style", () => {
     expect(parseBadgeStyle("card")).toBe("card");
   });
 
-  it("sizes itself to its content", () => {
-    // The prototype hardcoded one width, which held only for a two-digit
-    // score and a one-letter grade.
-    const widthOf = (svg: string) => Number(/width="(\d+)"/.exec(svg)![1]);
-
-    expect(widthOf(scoreBadge(100, "A+", "card"))).toBeGreaterThan(
-      widthOf(scoreBadge(9, "F", "card")),
+  it("is always 218 x 38, whatever it contains", () => {
+    // One fixed size so two badges in a list line up. 218 is derived from the
+    // widest content that can occur, not typed in — this pins the number so a
+    // font-size change fails here instead of overflowing the card silently.
+    const sizes = new Set(
+      [
+        scoreBadge(100, "A+", "card"),
+        scoreBadge(9, "F", "card"),
+        scoreBadge(85, "A", "card"),
+        unknownBadge("card"),
+      ].map((svg) =>
+        /width="([\d.]+)" height="([\d.]+)"/.exec(svg)!.slice(1).join("x"),
+      ),
     );
+
+    expect([...sizes]).toEqual(["218x38"]);
+  });
+
+  it("keeps the widest content clear of the rule", () => {
+    // 100 + A+ is the tightest fit there is. If it ever collides, the derived
+    // width above is wrong.
+    const svg = scoreBadge(100, "A+", "card");
+    const ruleX = Number(/<line x1="([\d.]+)"/.exec(svg)![1]);
+    const valueX = Number(
+      [...svg.matchAll(/<text x="([\d.]+)"/g)].map((m) => Number(m[1]) / 10)[1],
+    );
+
+    expect(valueX).toBeGreaterThan(ruleX);
+  });
+
+  it("gives every one-letter grade the same chip, and A+ a wider one", () => {
+    const chipOf = (svg: string) =>
+      Number(
+        /<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="20"/.exec(
+          svg,
+        )![1],
+      );
+
+    const singles = (["A", "B", "C", "D", "F"] as const).map((g) =>
+      chipOf(scoreBadge(70, g, "card")),
+    );
+
+    expect(new Set(singles).size).toBe(1);
+    expect(chipOf(scoreBadge(97, "A+", "card"))).toBeGreaterThan(singles[0]!);
   });
 
   it("brings its own background rather than borrowing the reader's", () => {
     // The whole reason for this style: grade colours cannot be tuned for a
-    // white and a near-black README at once, so it supplies its own ground.
-    expect(scoreBadge(85, "A", "card")).toContain("#161a1f");
+    // white and a near-black README at once, so it supplies its own ground —
+    // which is also what lets it use hues far brighter than GRADE_HEX.
+    const svg = scoreBadge(85, "A", "card");
+
+    expect(svg).toContain("#090d16");
+    expect(svg).toContain("#22c55e");
+    expect(svg).not.toContain(GRADE_HEX_A);
   });
 
-  it("shows the grade colour only on the spine and the letter", () => {
+  it("puts the accent on the dot and the chip, and nowhere else", () => {
     const svg = scoreBadge(31, "F", "card");
-    expect(svg.match(/#a8322f/g)).toHaveLength(2);
+
+    // Dot fill, chip fill, chip stroke.
+    expect(svg.match(/#ef4444/g)).toHaveLength(3);
+    // The letter itself is the lighter tint — it sits on the tinted fill.
+    expect(svg.match(/#f87171/g)).toHaveLength(1);
   });
 
-  it("drops the number, grade and /100 when there is no score", () => {
-    // A hero figure that does not exist is worse than no card.
+  it("drops the chip entirely when there is no grade", () => {
+    // A hollow chip would read as a grade we failed to draw.
     const svg = unknownBadge("card");
 
     expect(svg).toContain("unknown");
-    expect(svg).not.toContain("/ 100");
-    // Label and the word "unknown", and nothing else — no grade block.
+    expect(svg).not.toContain('rx="6"');
     expect(svg.match(/<text/g)).toHaveLength(2);
-    expect(scoreBadge(85, "A", "card").match(/<text/g)).toHaveLength(4);
+    expect(scoreBadge(85, "A", "card").match(/<text/g)).toHaveLength(3);
   });
 
-  it("says what it is to a screen reader in its real casing", () => {
-    // The card draws GITCHECKUP; the accessible name must not, because some
-    // screen readers spell all-caps strings out letter by letter.
-    const svg = scoreBadge(85, "A", "card");
-
-    expect(svg).toContain('aria-label="gitcheckup: 85 A"');
-    expect(svg).toContain(">GITCHECKUP<");
+  it("says what it is to a screen reader", () => {
+    expect(scoreBadge(85, "A", "card")).toContain(
+      'aria-label="gitcheckup: 85 A"',
+    );
   });
 
-  it("gives each card a unique clip id, so two on one page do not collide", () => {
+  it("gives each card a unique filter id, so two on one page do not collide", () => {
     const a = /id="([^"]+)"/.exec(scoreBadge(85, "A", "card"))![1];
     const b = /id="([^"]+)"/.exec(scoreBadge(31, "F", "card"))![1];
 
