@@ -25,10 +25,20 @@ const GRADE_HEX: Record<Grade, string> = {
 };
 
 const LABEL = "gitcheckup";
-const LABEL_BG = "#3f3f46";
+/** Shields' own label grey. Anything darker loses the contrast with the value. */
+const LABEL_BG = "#555";
 const HEIGHT = 20;
-const CHAR_WIDTH = 6.6;
 const PADDING = 10;
+
+/**
+ * Approximate Verdana advance width at 11px, per character.
+ *
+ * Only an estimate — but `textLength` below makes it exact anyway: the browser
+ * stretches the glyphs to whatever this says, so a slightly wrong guess shifts
+ * letter spacing rather than pushing text out of its box. That is the whole
+ * reason shields.io badges never overflow on a font the viewer does not have.
+ */
+const CHAR_WIDTH = 6.6;
 
 /**
  * XML-escapes text before interpolation. Nothing user-controlled reaches this
@@ -54,6 +64,26 @@ export interface BadgeOptions {
   style: BadgeStyle;
 }
 
+/**
+ * One half of the badge's text, drawn twice.
+ *
+ * The first copy is a near-black shadow at 30% opacity, one tenth of a unit
+ * below the real glyphs. That single detail is most of why a shields.io badge
+ * reads as crisp and a naive one reads as muddy: white text on mid-grey has
+ * poor edge definition, and the shadow gives every stroke a boundary.
+ *
+ * Coordinates are ten times their real size and scaled back down by `scale(.1)`
+ * — SVG rounds font metrics to the user-unit grid, so working at 10× and
+ * shrinking keeps sub-pixel positions that would otherwise be lost.
+ */
+function textPair(centre: number, text: string, width: number): string {
+  const x = centre * 10;
+  const length = (width - PADDING * 2) * 10;
+
+  return `<text aria-hidden="true" x="${x}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${length}">${text}</text>
+    <text x="${x}" y="140" transform="scale(.1)" textLength="${length}">${text}</text>`;
+}
+
 export function renderBadge({ message, color, style }: BadgeOptions): string {
   const label = escapeXml(LABEL);
   const value = escapeXml(message);
@@ -63,16 +93,29 @@ export function renderBadge({ message, color, style }: BadgeOptions): string {
   const total = labelWidth + valueWidth;
   const radius = style === "flat-square" ? 0 : 3;
 
+  // `flat` carries a barely-visible vertical sheen; `flat-square` is matte by
+  // definition, and painting one there is what makes a "square" badge look
+  // like a mistake rather than a choice.
+  const sheen =
+    style === "flat-square"
+      ? ""
+      : `<linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>`;
+  const sheenRect =
+    style === "flat-square"
+      ? ""
+      : `<rect width="${total}" height="${HEIGHT}" fill="url(#s)"/>`;
+
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${total}" height="${HEIGHT}" viewBox="0 0 ${total} ${HEIGHT}" role="img" aria-label="${label}: ${value}">
   <title>${label}: ${value}</title>
-  <clipPath id="r"><rect width="${total}" height="${HEIGHT}" rx="${radius}" fill="#fff"/></clipPath>
+  ${sheen}<clipPath id="r"><rect width="${total}" height="${HEIGHT}" rx="${radius}" fill="#fff"/></clipPath>
   <g clip-path="url(#r)">
     <rect width="${labelWidth}" height="${HEIGHT}" fill="${LABEL_BG}"/>
     <rect x="${labelWidth}" width="${valueWidth}" height="${HEIGHT}" fill="${color}"/>
+    ${sheenRect}
   </g>
-  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">
-    <text x="${labelWidth / 2}" y="14">${label}</text>
-    <text x="${labelWidth + valueWidth / 2}" y="14">${value}</text>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
+    ${textPair(labelWidth / 2, label, labelWidth)}
+    ${textPair(labelWidth + valueWidth / 2, value, valueWidth)}
   </g>
 </svg>`;
 }

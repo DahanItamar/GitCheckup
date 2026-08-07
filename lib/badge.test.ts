@@ -78,3 +78,37 @@ describe("escaping", () => {
     expect(svg).toContain("&apos;");
   });
 });
+
+describe("what makes it look right rather than merely correct", () => {
+  const svg = scoreBadge(85, "A", "flat");
+
+  it("draws each label twice — a shadow, then the glyphs", () => {
+    // White on mid-grey has poor edge definition. The 30%-opacity near-black
+    // copy one notch below is most of why a shields badge reads as crisp.
+    expect(svg.match(/<text/g)).toHaveLength(4);
+    expect(svg).toContain('fill="#010101" fill-opacity=".3"');
+  });
+
+  it("pins every string to an exact width", () => {
+    // Without textLength the badge depends on the viewer having Verdana. With
+    // it, a wrong metric shifts letter spacing instead of overflowing the box.
+    expect(svg.match(/textLength="\d+"/g)?.length).toBe(4);
+  });
+
+  it("works at ten times scale, then shrinks", () => {
+    // SVG rounds font metrics to the user-unit grid; 10x preserves sub-pixel
+    // positions that would otherwise be lost.
+    expect(svg).toContain('transform="scale(.1)"');
+    expect(svg).toContain('font-size="110"');
+  });
+
+  it("carries the sheen on flat and not on flat-square", () => {
+    expect(svg).toContain("linearGradient");
+    // A "square" badge with a gradient reads as a mistake, not a choice.
+    expect(scoreBadge(85, "A", "flat-square")).not.toContain("linearGradient");
+  });
+
+  it("still renders exactly one shape per side", () => {
+    expect(svg.match(/<rect/g)?.length).toBe(4); // clip + label + value + sheen
+  });
+});
