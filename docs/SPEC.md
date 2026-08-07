@@ -880,7 +880,10 @@ Numbered so any one can be rejected without reopening the rest.
    - **The old GitHub slug still resolves.** GitHub permanently redirects `repogauge` → `RepoGauge`, so anything already linking to the old URL keeps working.
 
 2. **A single server-side PAT serves all users; there is no per-user token entry.** Rejecting this adds an optional "paste your own token" field and a whole trust conversation about handling someone else's credential — a meaningfully different product.
-3. **6-hour score TTL, 7-day stale ceiling, 6-hour CDN cache on images.** Pure tuning constants in `lib/config.ts`; change freely.
+3. **6-hour score TTL, 7-day stale ceiling, 6-hour CDN cache on images, 30-day score history.** Pure tuning constants in `lib/config.ts`; change freely.
+
+   **[M5] The history window is what bounds the database.** `scores` is insert-only — the latest row wins and the older ones were never removed, so storage tracked score _events_ rather than repositories: a continuously-viewed repo added four rows a day, forever. `sweepScoreHistory` deletes rows that are both past `SCORE_HISTORY_DAYS` **and** not the newest for their repository. The second condition is the load-bearing one: age alone would eventually delete the only score a long-tail repo has, turning every later visit into a cold six-call fan-out — a cache that empties itself is worse than one that grows. Measured on PGlite over a simulated year (200 repos, 20 refreshed four times a day): **29,380 rows / 59.3 MB → 2,600 rows / 5.3 MB**, with all 200 repos still holding a current score. The second figure is a steady state rather than a slower slope — 200 latest rows plus 30 days of history for the active ones — so growth is bounded by traffic shape instead of by uptime. Swept on ~1% of writes like the rate-limit counter, because §3 says not to add a cron without a measured problem.
+
 4. **30 cold scores per IP per hour.** A guess calibrated to "one enthusiastic human, not a script." Adjust after seeing real traffic.
 5. **The 50-star floor on `/trending`.** Lower it and the leaderboard becomes whatever was last pasted; raise it and the page stays empty longer.
 6. **The rubric weights in §5 are the launch values and will be wrong.** `rubric_version` exists specifically so tuning them is a one-line change plus a cache invalidation, not a migration.

@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 
+import { SCORE_HISTORY_DAYS } from "@/lib/config";
 import type { Grade, ScoreResult } from "@/lib/score/types";
 
 import { db } from "./client";
@@ -91,6 +92,55 @@ export async function saveScore(record: ScoreRecord): Promise<void> {
     tips: record.score.tips,
     rubricVersion: record.rubricVersion,
   });
+
+  await maybeSweepHistory();
+}
+
+/** Superseded rows are swept on roughly this share of writes — no cron. */
+const SWEEP_PROBABILITY = 0.01;
+
+/**
+ * Deletes score rows that are both old and superseded.
+ *
+ * This table is insert-only by design — the latest row wins and the older
+ * ones were simply never removed, so a continuously-viewed repo grew by four
+ * rows a day indefinitely. Storage was tracking score *events* rather than
+ * repositories, which is the shape that eventually fills any tier.
+ *
+ * Two conditions, and the second is the one that matters: a row must be past
+ * the retention window **and** not be the newest for its repository. Age alone
+ * would eventually delete the only score a rarely-visited repo has, turning
+ * every subsequent visit into a cold six-call fan-out — a cache that empties
+ * itself, which is worse than one that grows.
+ *
+ * Swept on a fraction of writes rather than on a schedule, like the rate-limit
+ * counter above it: SPEC §3 says not to add a cron without a measured problem.
+ */
+async function maybeSweepHistory(): Promise<void> {
+  if (Math.random() >= SWEEP_PROBABILITY) return;
+  await sweepScoreHistory();
+}
+
+/** Exported for the integration test, which cannot wait on a 1% coin flip. */
+export async function sweepScoreHistory(now: Date = new Date()): Promise<void> {
+  const cutoff = new Date(
+    now.getTime() - SCORE_HISTORY_DAYS * 24 * 60 * 60 * 1000,
+  );
+
+  try {
+    await db.execute(sql`
+      delete from ${scores}
+      where ${scores.fetchedAt} < ${cutoff}
+        and ${scores.id} not in (
+          select distinct on (${scores.repoId}) ${scores.id}
+          from ${scores}
+          order by ${scores.repoId}, ${scores.fetchedAt} desc
+        )
+    `);
+  } catch (cause) {
+    // Housekeeping must never fail the request that triggered it.
+    console.error("[scores] history sweep failed", cause);
+  }
 }
 
 /**

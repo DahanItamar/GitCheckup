@@ -119,6 +119,21 @@ export const IMAGE_CACHE_SECONDS = 6 * 60 * 60;
 export const COLD_SCORES_PER_HOUR = 30;
 
 /**
+ * How long superseded score rows are kept.
+ *
+ * `scores` is insert-only: every refresh writes a new row and the latest one
+ * wins. Nothing read the older rows, and nothing deleted them either, so a
+ * repo viewed continuously accrued four rows a day — about 3 MB a year, per
+ * repo, forever.
+ *
+ * 30 days covers the 7-day `/trending` window with a wide margin and leaves a
+ * month of history for a score-over-time view, should one ever be built. The
+ * newest row for a repo is never swept, whatever its age, so this bounds
+ * growth without ever costing a cache hit.
+ */
+export const SCORE_HISTORY_DAYS = 30;
+
+/**
  * The rubric weights this build produces. Bumped in the same commit as any
  * weight change; a cached row at an older version is a cache miss (SPEC §8).
  *

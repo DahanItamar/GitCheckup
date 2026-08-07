@@ -29,7 +29,7 @@ purpose.
 breakdown, ranked fixes, a downloadable fix plan, a share card, a badge, and a
 leaderboard.
 
-**269 tests, and the database half is covered too.** The migrations and every
+**276 tests, and the database half is covered too.** The migrations and every
 query run against real Postgres in CI — [PGlite](https://pglite.dev), which is
 Postgres compiled to WebAssembly, so `DISTINCT ON`, `jsonb`, `ON CONFLICT` and
 the CHECK constraints behave exactly as they will in production. No credentials
