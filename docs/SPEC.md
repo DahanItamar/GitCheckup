@@ -709,7 +709,12 @@ End state: the repo alone sells it.
 
 Numbered so any one can be rejected without reopening the rest.
 
-1. **[M1] The repo lives at `C:\Users\USER\Documents\RepoGauge` and the GitHub name is `DahanItamar/RepoGauge`.** Revised from the original lowercase `repogauge`: the product name is `RepoGauge`, and the identifiers now match it everywhere rather than splitting brand from slug. `package.json` carries `"name": "RepoGauge"` too — legal because the package is `private: true`. **If this package is ever published to npm, that name must go back to lowercase**; npm rejects capitals outright. Nothing else depends on the casing: GitHub paths are case-insensitive and redirect from the old slug, and Windows paths are case-insensitive, so the rename broke no reference.
+1. **[M1] The GitHub name is `DahanItamar/RepoGauge`; the package name is `RepoGauge`. One working copy still sits at the lowercase `C:\Users\USER\Documents\repogauge`.** Revised from the original all-lowercase assumption: the product is called RepoGauge, and the identifiers now match it rather than splitting brand from slug. Three notes, each of which has bitten once:
+
+   - **npm.** `package.json` carries `"name": "RepoGauge"`, which is legal _only_ because the package is `private: true`. **If this is ever published, that field must go back to lowercase** — npm rejects capitals outright. Verified, not assumed.
+   - **The local directory is deliberately not renamed.** A case-only rename on Windows needs every handle on the folder released, and an open editor or shell holds one. It buys nothing: NTFS is case-insensitive, so both spellings resolve to the same directory and no reference breaks. A fresh `git clone` produces `RepoGauge/`, which is what the §4 tree shows.
+   - **The old GitHub slug still resolves.** GitHub permanently redirects `repogauge` → `RepoGauge`, so anything already linking to the old URL keeps working.
+
 2. **A single server-side PAT serves all users; there is no per-user token entry.** Rejecting this adds an optional "paste your own token" field and a whole trust conversation about handling someone else's credential — a meaningfully different product.
 3. **6-hour score TTL, 7-day stale ceiling, 6-hour CDN cache on images.** Pure tuning constants in `lib/config.ts`; change freely.
 4. **30 cold scores per IP per hour.** A guess calibrated to "one enthusiastic human, not a script." Adjust after seeing real traffic.
