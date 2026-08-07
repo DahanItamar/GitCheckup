@@ -134,7 +134,7 @@ describe("the card style", () => {
   it("brings its own background rather than borrowing the reader's", () => {
     // The whole reason for this style: grade colours cannot be tuned for a
     // white and a near-black README at once, so it supplies its own ground.
-    expect(scoreBadge(85, "A", "card")).toContain("#1b1f24");
+    expect(scoreBadge(85, "A", "card")).toContain("#161a1f");
   });
 
   it("shows the grade colour only on the spine and the letter", () => {
@@ -153,10 +153,13 @@ describe("the card style", () => {
     expect(scoreBadge(85, "A", "card").match(/<text/g)).toHaveLength(4);
   });
 
-  it("still says what it is to a screen reader", () => {
-    expect(scoreBadge(85, "A", "card")).toContain(
-      'aria-label="gitcheckup: 85 A"',
-    );
+  it("says what it is to a screen reader in its real casing", () => {
+    // The card draws GITCHECKUP; the accessible name must not, because some
+    // screen readers spell all-caps strings out letter by letter.
+    const svg = scoreBadge(85, "A", "card");
+
+    expect(svg).toContain('aria-label="gitcheckup: 85 A"');
+    expect(svg).toContain(">GITCHECKUP<");
   });
 
   it("gives each card a unique clip id, so two on one page do not collide", () => {
