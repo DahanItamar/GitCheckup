@@ -27,16 +27,19 @@ purpose.
 **All five milestones are written.** Paste a repo and you get a live score, a
 breakdown, ranked fixes, a share card, a badge, and a leaderboard.
 
-**One half of it is unproven: the database.** Pure logic is covered by 180
-tests, and the image routes were verified by rendering them and looking at the
-output — but **no SQL has ever run against a real Postgres**. The cache, the
-rate-limit counter and the trending query are all untested against a database.
-Point `DATABASE_URL` at a Neon project and run `pnpm db:migrate` to find out.
+**209 tests, and the database half is covered too.** The migrations and every
+query run against real Postgres in CI — [PGlite](https://pglite.dev), which is
+Postgres compiled to WebAssembly, so `DISTINCT ON`, `jsonb`, `ON CONFLICT` and
+the CHECK constraints behave exactly as they will in production. No credentials
+needed, which is why it runs on every commit.
+
+What is still unproven is deployment: the Neon HTTP driver specifically, and a
+real README embed through GitHub's Camo proxy.
 
 | Milestone | What it adds                                   | State                                    |
 | --------- | ---------------------------------------------- | ---------------------------------------- |
 | M1        | A real score, live                             | ✅ done                                  |
-| M2        | Neon cache, `/api/score`, instant repeat views | 🚧 code complete, needs a database       |
+| M2        | Neon cache, `/api/score`, instant repeat views | ✅ done (needs a Neon URL to run)        |
 | M3        | OG share card, README embed snippets           | ✅ done                                  |
 | M4        | Rate limiting, `/trending`, SVG badge          | ✅ done                                  |
 | M5        | LICENSE, CI, dogfooding                        | ✅ done (dogfooding needs a public repo) |
@@ -136,7 +139,7 @@ never disagree about a score.
 ## Scripts
 
 ```bash
-pnpm test          # vitest — the rubric and slug parser are the covered surface
+pnpm test          # vitest — unit tests plus real-Postgres integration tests
 pnpm lint          # eslint, including the dependency-direction rules
 pnpm typecheck     # tsc --noEmit, strict + noUncheckedIndexedAccess
 pnpm deps:check    # madge --circular

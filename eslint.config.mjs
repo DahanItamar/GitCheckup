@@ -53,6 +53,20 @@ const eslintConfig = defineConfig([
     rules: { "max-lines-per-function": "off" },
   },
 
+  // A `describe` block is a grouping construct, not a function with logic.
+  // The size limits exist to stop unreadable procedures; splitting a suite to
+  // satisfy them would scatter related cases for no reader's benefit.
+  {
+    files: ["**/*.test.ts"],
+    rules: {
+      "max-lines-per-function": "off",
+      "max-lines": [
+        "error",
+        { max: 800, skipBlankLines: true, skipComments: true },
+      ],
+    },
+  },
+
   // lib/score/ is pure: it imports nothing but its own types, and type-only
   // references to the signal shape it is handed.
   {

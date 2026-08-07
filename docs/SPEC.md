@@ -6,9 +6,9 @@
 > tagged **[M1]**–**[M5]** with the milestone that taught us the design was
 > wrong. Nothing below is aspirational unless it says so.
 >
-> **Unverified:** no SQL has ever run against a real Postgres. Everything in §5
-> below the domain types, and every query in `lib/db/`, is untested against a
-> database.
+> **Verified:** the migrations and every query in `lib/db/` run against real
+> Postgres in CI, via PGlite. What remains unproven is the Neon HTTP transport
+> and a live deployment — not the SQL.
 
 ## 1. Problem & Users
 
@@ -693,7 +693,7 @@ without a cache: `loading.tsx` and `error.tsx`, which §10 assigns to M2.
 **M2 — Cache and persistence**
 End state: the second view of a repo is instant, and the same score survives a redeploy.
 
-- [~] Neon project, `DATABASE_URL`, Drizzle schema for `repos` and `scores`, first migration committed — **schema and `drizzle/0000_init.sql` are written and committed; no Neon project exists yet, so the migration has never been applied**
+- [~] Neon project, `DATABASE_URL`, Drizzle schema for `repos` and `scores`, first migration committed — **schema and migrations written, committed, and applied against real Postgres in CI; no Neon project exists yet, so they have never run against Neon itself**
 - [x] `lib/services/score-repo.ts` — the fresh / stale / cold branches from Flow A, including `rubric_version`
 - [x] Stale-while-revalidate via `after()`
 - [x] `GET /api/score` returning the JSON contract from §6
@@ -703,10 +703,23 @@ End state: the second view of a repo is instant, and the same score survives a r
 determines whether a user waits on GitHub — is a pure function in
 `lib/services/freshness.ts` with 20 tests covering both sides of the 6-hour TTL
 and the 7-day ceiling, rubric-version mismatch in both directions, and clock
-skew. Everything else typechecks and builds, but **no query has ever run
-against a real Postgres**. Applying the migration and confirming one cold →
-fresh → stale round trip is the remaining M2 work, and it needs a
-`DATABASE_URL`.
+skew.
+
+**The SQL is verified too, without a Neon account.** `lib/db/test-postgres.ts`
+starts [PGlite](https://pglite.dev) — Postgres compiled to WebAssembly, not a
+mock and not SQLite — applies the committed migrations verbatim, and the
+integration tests exercise the production query functions unchanged by
+swapping `lib/db/client.ts` for the test database. That covers what a type
+checker cannot: `DISTINCT ON` inside a subquery, `ON CONFLICT` incrementing
+rather than resetting, `jsonb` round-tripping as structures, the
+case-insensitive slug index, and both CHECK constraints rejecting bad rows.
+
+It runs in CI with no secrets, so the persistence layer stays verified on every
+commit rather than only on the day someone happens to have a database to hand.
+
+**Still unproven:** the `@neondatabase/serverless` HTTP transport specifically.
+PGlite proves the SQL is correct; it does not prove Neon's driver speaks it
+identically. That gap closes on the first real deployment, not before.
 
 **[M2] Two failure paths the spec implied but did not spell out.**
 
