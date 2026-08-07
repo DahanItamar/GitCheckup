@@ -36,7 +36,7 @@ Point `DATABASE_URL` at a Neon project and run `pnpm db:migrate` to find out.
 | --------- | ---------------------------------------------- | ---------------------------------- |
 | M1        | A real score, live                             | ✅ done                            |
 | M2        | Neon cache, `/api/score`, instant repeat views | 🚧 code complete, needs a database |
-| M3        | OG share card, README embed snippets           | planned                            |
+| M3        | OG share card, README embed snippets           | ✅ done (badge snippet awaits M4)  |
 | M4        | Rate limiting, `/trending`, SVG badge          | planned                            |
 | M5        | README, CI, dogfooding                         | planned                            |
 

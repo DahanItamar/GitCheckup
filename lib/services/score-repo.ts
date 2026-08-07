@@ -21,6 +21,19 @@ import { decideCacheAction } from "./freshness";
 export interface ScoreRepoOptions {
   /** Skip the freshness check and force a GitHub fetch. Rate-limited callers only. */
   forceRefresh?: boolean;
+
+  /**
+   * Serve whatever is cached, at any age, and never touch GitHub — not even
+   * behind the response (SPEC §7 Flow B step 3).
+   *
+   * The image routes set this. They are called by GitHub's Camo proxy on
+   * every README view of every repo that embeds a card, so if they could
+   * trigger fetches, long-tail embed traffic would drain the 5000/hr budget
+   * with no user waiting on the result. Only a completely unknown repo costs
+   * a fetch. Freshness is a UI concern; the card trades it for a hard ceiling
+   * on outbound calls.
+   */
+  neverRefresh?: boolean;
 }
 
 export interface ScoredRepo {
@@ -44,6 +57,17 @@ export async function getOrComputeScore(
   const action = options?.forceRefresh
     ? "cold"
     : decideCacheAction(cached, RUBRIC_VERSION, now);
+
+  // Flow B: an image route takes what we have and asks GitHub for nothing.
+  // The rubric version is still honoured — a card contradicting the page it
+  // links to would be worse than a slow card.
+  if (
+    cached !== null &&
+    options?.neverRefresh === true &&
+    cached.rubricVersion === RUBRIC_VERSION
+  ) {
+    return serve(cached, { stale: action !== "fresh" });
+  }
 
   if (cached !== null && action === "fresh") {
     return serve(cached, { stale: false });

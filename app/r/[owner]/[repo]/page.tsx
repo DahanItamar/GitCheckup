@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 
 import { CategoryBreakdown } from "@/components/CategoryBreakdown";
+import { EmbedSnippets } from "@/components/EmbedSnippets";
 import { RepoError } from "@/components/RepoError";
 import { RepoInput } from "@/components/RepoInput";
 import { ScoreDial } from "@/components/ScoreDial";
 import { TipList } from "@/components/TipList";
+import { SITE_URL } from "@/lib/config";
 import { isRepoGaugeError } from "@/lib/errors";
 import { parseRepoSlug } from "@/lib/repo-slug";
 import { getOrComputeScore, type ScoredRepo } from "@/lib/services/score-repo";
@@ -24,11 +26,32 @@ export async function generateMetadata({
   params,
 }: RouteParams): Promise<Metadata> {
   const { owner, repo } = await params;
-  // Scoring here as well as in the page would double the GitHub fan-out. The
-  // score-aware title and og:image land in M3, behind the database cache.
+  const slug = parseRepoSlug(`${owner}/${repo}`);
+  const label =
+    slug === null ? `${owner}/${repo}` : `${slug.owner}/${slug.name}`;
+
+  // The card URL carries only the slug — the image route re-derives the score
+  // itself rather than trusting a query parameter (SPEC §3). Scoring here as
+  // well as in the page would double the GitHub fan-out for no gain.
+  const image = `${SITE_URL}/api/og?repo=${encodeURIComponent(label)}`;
+  const description = `RepoGauge score for ${label} — docs, community, activity, popularity and hygiene, out of 100.`;
+
   return {
-    title: `${owner}/${repo}`,
-    description: `RepoGauge score for ${owner}/${repo} — docs, community, activity, popularity and hygiene, out of 100.`,
+    title: label,
+    description,
+    openGraph: {
+      title: `${label} · RepoGauge`,
+      description,
+      url: `${SITE_URL}/r/${label}`,
+      images: [{ url: image, width: 1200, height: 630 }],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${label} · RepoGauge`,
+      description,
+      images: [image],
+    },
   };
 }
 
@@ -90,6 +113,7 @@ function Result({ result }: { result: ScoredRepo }) {
       <div className="mt-14 space-y-14">
         <CategoryBreakdown categories={score.categories} />
         <TipList tips={score.tips} />
+        <EmbedSnippets owner={repo.owner} name={repo.name} siteUrl={SITE_URL} />
 
         <section className="border-t border-border pt-10">
           <h2 className="text-xs font-medium tracking-[0.14em] text-muted uppercase">

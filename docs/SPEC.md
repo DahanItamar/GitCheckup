@@ -697,11 +697,34 @@ posture §8 takes toward a degraded GitHub.
 **M3 — The share card**
 End state: pasting a result URL into Slack shows a card, and the README snippet works.
 
-- [ ] `app/api/og/route.tsx` with `ImageResponse`, 1200×630, re-deriving the score server-side
-- [ ] Fallback card on error at status 200
-- [ ] `generateMetadata` on the result page wiring `og:image` and `twitter:card`
-- [ ] `EmbedSnippets` — copy Markdown, download PNG
-- [ ] Long cache headers on `/api/og`; verify a real embed renders through GitHub's Camo proxy
+- [x] `app/api/og/route.tsx` with `ImageResponse`, 1200×630, re-deriving the score server-side
+- [x] Fallback card on error at status 200
+- [x] `generateMetadata` on the result page wiring `og:image` and `twitter:card`
+- [~] `EmbedSnippets` — copy Markdown, download PNG — **card snippet only; see below**
+- [~] Long cache headers on `/api/og`; verify a real embed renders through GitHub's Camo proxy — **headers set and confirmed; the Camo check needs a public deployment**
+
+**[M3] The badge snippet is withheld until M4.** Flow C specifies two
+snippets, but `/api/badge` does not exist until M4, and a copy-paste that 404s
+inside someone else's README is worse than one fewer option. `EmbedSnippets`
+ships the card snippet alone and regains the badge when the route lands.
+
+**[M3] `neverRefresh` was added to `ScoreRepoOptions`.** Flow B step 3 requires
+that the image routes never trigger a GitHub fetch for an already-known repo,
+but the M2 service scheduled a background refresh on every stale hit — which
+would have let long-tail Camo traffic drain the token budget through the back
+door, exactly the failure §8 designs against. The option makes any cached
+score, at any age, serve as-is with no outbound call. The rubric version is
+still honoured: a card contradicting the page it links to would be worse than
+a slow card.
+
+**[M3] What was verified.** Cards were rendered against live GitHub data and
+inspected as images, not just as byte counts: `rust-lang/rust` (94, A+, three
+tips), `jaywcjlove/awesome-mac` (97, A+, one tip — the sparse case), an invalid
+slug, and an unknown repo. Both failure paths return `image/png` at status
+200 with `s-maxage=21600`. Three layout bugs were found and fixed this way that
+compilation could not surface: the grade collided with the first category bar,
+the footer collided with the last tip, and tip text truncated mid-word with
+240px of unused width.
 
 **M4 — Survive the spike**
 End state: someone can point a script at it and the token budget holds.
