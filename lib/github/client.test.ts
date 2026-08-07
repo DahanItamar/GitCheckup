@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { SITE_URL } from "@/lib/config";
+
 import { githubGet } from "./client";
 import { GitHubError, isGitHubError } from "./errors";
 
@@ -62,6 +64,21 @@ describe("the request it sends", () => {
     expect(headers.Accept).toBe("application/vnd.github+json");
     expect(headers["X-GitHub-Api-Version"]).toBe("2022-11-28");
     expect(headers["User-Agent"]).toContain("RepoGauge");
+  });
+
+  it("points GitHub at the configured site, not at a hardcoded repo", async () => {
+    // The contact address used to be this repository's GitHub URL, which went
+    // dead the moment the repository was private — a 404 for the one party the
+    // header exists to help. It now tracks NEXT_PUBLIC_SITE_URL.
+    fetchMock.mockResolvedValue(reply(200, { body: {} }));
+
+    await githubGet("/repos/a/b");
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const agent = (init.headers as Record<string, string>)["User-Agent"];
+
+    expect(agent).toBe(`RepoGauge (+${SITE_URL})`);
+    expect(agent).not.toContain("github.com/");
   });
 
   it("opts out of Next's fetch cache", async () => {

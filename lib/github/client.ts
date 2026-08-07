@@ -1,4 +1,4 @@
-import { GITHUB_TOKEN } from "@/lib/config";
+import { GITHUB_TOKEN, SITE_URL } from "@/lib/config";
 
 import { GitHubError } from "./errors";
 
@@ -17,9 +17,20 @@ const REQUEST_TIMEOUT_MS = 5_000;
 
 /**
  * GitHub asks that clients identify themselves, and uses this to reach the
- * operator when a client misbehaves (SPEC §11.1).
+ * operator when a client misbehaves (SPEC §11.1). Requests without a
+ * `User-Agent` are refused outright, so this is not decoration.
+ *
+ * It points at the deployed site rather than at the source repository, and
+ * takes that address from `NEXT_PUBLIC_SITE_URL` — the same value the embed
+ * snippets and the share card already use. A second variable holding "the site
+ * URL, but for GitHub" would only ever be the first one with a typo, and the
+ * previous hardcoded repository URL had already gone dead: the repository is
+ * private, so the contact point GitHub was told to use returned a 404.
+ *
+ * Unset in development, `SITE_URL` falls back to localhost. Harmless — GitHub
+ * only reads this when it wants to reach someone about production traffic.
  */
-const USER_AGENT = "RepoGauge (+https://github.com/DahanItamar/RepoGauge)";
+const USER_AGENT = `RepoGauge (+${SITE_URL})`;
 
 /**
  * GETs a path under api.github.com and parses the JSON body.
