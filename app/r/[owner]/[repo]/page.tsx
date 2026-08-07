@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 
 import { CategoryBreakdown } from "@/components/CategoryBreakdown";
+import { CompareInput } from "@/components/CompareInput";
 import { EmbedSnippets } from "@/components/EmbedSnippets";
 import { gradeTint } from "@/components/grade-color";
 import { StarIcon } from "@/components/icons";
@@ -158,6 +159,15 @@ function Result({
         <CategoryBreakdown categories={score.categories} />
         <TipList tips={score.tips} owner={repo.owner} name={repo.name} />
         <EmbedSnippets owner={repo.owner} name={repo.name} siteUrl={SITE_URL} />
+
+        <section className="border-t border-border pt-10">
+          <h2 className="text-xs font-medium tracking-[0.14em] text-muted uppercase">
+            Compare with
+          </h2>
+          <div className="mt-4 max-w-xl">
+            <CompareInput owner={repo.owner} name={repo.name} />
+          </div>
+        </section>
 
         <section className="border-t border-border pt-10">
           <h2 className="text-xs font-medium tracking-[0.14em] text-muted uppercase">

@@ -624,6 +624,18 @@ Like `/api/og`, the route accepts only a slug and re-derives the score server-si
 
 The 50-star floor is deliberate: without it, the leaderboard is whatever anyone last pasted, including repos named to be seen on our homepage (§9).
 
+### [M5] Flow E — Compare two repos (`/compare/{a}/vs/{b}`)
+
+1. `/compare/facebook/react/vs/vercel/next.js` — an explicit five-segment route, so Next guarantees the arity and the page validates only the two slugs.
+2. `compareRepos` is `getOrComputeScore` twice, concurrently. It adds no fetching or caching of its own: the cache, the freshness ladder, the per-IP cold budget and demo mode all apply unchanged to both sides. Sequentially, two uncached repos would pay two full six-call fan-outs end to end for no reason — GitHub's budget is counted in requests, not parallelism.
+3. Comparing a repo with itself is an `INVALID_SLUG`, checked case-insensitively.
+
+**Radar is the right form here and the wrong form on the result page.** For one repository, five bars against a shared baseline beat five radial axes — which is what §7 Flow A renders. The job changes when there are two: both can score 71 for entirely different reasons, and the shape difference _is_ that fact. Three rules keep it honest:
+
+- **Every axis is normalised to its own category maximum, and the caption says so.** The categories are worth 25/20/20/15/20, so plotting raw points would make Docs the widest axis on every chart ever drawn — describing the rubric's weighting rather than the repositories. A test asserts that five equally-full categories draw a regular pentagon.
+- **The paired bars stay underneath.** They carry the magnitudes the radar normalises away, including the denominators, which after normalisation exist nowhere else on the page. Radar alone is a shape you cannot read numbers off.
+- **Identity uses a categorical pair, never the grade ramp.** Green already means "scored well"; reusing it for "repo A" would put two meanings in one ink. `--series-a`/`--series-b` are slots 1 and 2 of a validated order — ΔE 24.7 apart under protanopia, 33.6 under normal vision, both clearing 3:1 against their surface in both schemes. Measured with the validator, not chosen by eye.
+
 ### [M5] Flow D′ — Most improved (`/improved`)
 
 1. `/improved` ranks by **gain**: the newest score in the window minus the oldest, per repo, biggest first.

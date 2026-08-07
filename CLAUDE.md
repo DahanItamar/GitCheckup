@@ -26,6 +26,7 @@ For where the project stands right now and what to do next, see
 | How long score history is kept        | `SCORE_HISTORY_DAYS` in `lib/config.ts` — the sweep never drops a latest row |
 | The score-over-time sparkline         | `components/ScoreSparkline.tsx`; data from `lib/services/score-history.ts`   |
 | What ranks on `/improved`             | `lib/db/scores.ts` → `findMostImproved` — by gain, never by absolute score   |
+| The two-repo comparison               | `components/CompareRadar.tsx` + `CompareBars.tsx`; `lib/services/compare.ts` |
 | The schema                            | `lib/db/schema.ts`, then `pnpm db:generate` — never hand-edit `drizzle/`     |
 | The share card / badge                | `components/ShareCard.tsx`, `lib/badge.ts`                                   |
 | The downloadable fix plan             | `lib/fix-plan.ts` — pure; `app/api/plan/` is a thin wrapper                  |
@@ -76,7 +77,7 @@ environment.
 
 ## Status
 
-All five milestones are built. 319 tests, CI green.
+All five milestones are built. 328 tests, CI green.
 
 `DEMO_MODE=1` runs the whole interface with no credentials at all — see
 [docs/HANDOFF.md](docs/HANDOFF.md). It is how the UI is reviewed locally, and
