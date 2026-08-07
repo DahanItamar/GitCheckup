@@ -83,6 +83,22 @@ const envSchema = z.object({
   /** v1 accepts exactly one provider. The seam exists; the choice does not. */
   TIPS_PROVIDER: blankIsAbsent(z.literal("rules").default("rules")),
 
+  /**
+   * The one request header the edge controls, when the app runs behind a proxy
+   * it does not own. See `lib/client-ip.ts` — the wrong answer here makes the
+   * rate limiter decorative rather than broken, which is worse.
+   *
+   * Lower-cased on purpose: `Headers.get` is case-insensitive, but a value
+   * that differs from the docs by capitalisation invites a bug report.
+   */
+  TRUSTED_CLIENT_IP_HEADER: blankIsAbsent(
+    z
+      .string()
+      .min(1)
+      .transform((value) => value.toLowerCase())
+      .optional(),
+  ),
+
   NEXT_PUBLIC_SITE_URL: blankIsAbsent(z.url().optional()),
   VERCEL_PROJECT_PRODUCTION_URL: blankIsAbsent(z.string().min(1).optional()),
 });
@@ -140,6 +156,9 @@ export const SITE_URL: string =
 export const SCORE_TTL_HOURS = 6;
 export const SCORE_STALE_CEILING_DAYS = 7;
 export const IMAGE_CACHE_SECONDS = 6 * 60 * 60;
+
+/** See `lib/client-ip.ts`. Unset means "the platform rewrites x-forwarded-for". */
+export const TRUSTED_CLIENT_IP_HEADER = env.TRUSTED_CLIENT_IP_HEADER;
 
 /** Cold scores permitted per IP per hour (SPEC §11 assumption 4). */
 export const COLD_SCORES_PER_HOUR = 30;

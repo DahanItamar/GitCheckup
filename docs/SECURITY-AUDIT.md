@@ -19,14 +19,14 @@ assessment of the code and have not been exploited or disproved.
 
 ## Summary
 
-| #   | Finding                                                       | Severity     | Status                              |
-| --- | ------------------------------------------------------------- | ------------ | ----------------------------------- |
-| 1   | No security response headers on any route                     | **Moderate** | **Fixed** in `next.config.ts`       |
-| 2   | `esbuild` advisory via `drizzle-kit` (dev only)               | **Low**      | Open, not exploitable in production |
-| 3   | Upstream values interpolated into a redirect path unvalidated | **Low**      | Open, defence-in-depth              |
-| 4   | Rate limiter fails open                                       | Info         | Deliberate, documented              |
-| 5   | `x-forwarded-for` trusted                                     | Info         | Deliberate, host-dependent          |
-| 6   | Database role has full DDL rights                             | Info         | Accepted                            |
+| #   | Finding                                                       | Severity                | Status                                 |
+| --- | ------------------------------------------------------------- | ----------------------- | -------------------------------------- |
+| 1   | No security response headers on any route                     | **Moderate**            | **Fixed** in `next.config.ts`          |
+| 2   | `esbuild` advisory via `drizzle-kit` (dev only)               | **Low**                 | Open, not exploitable in production    |
+| 3   | Upstream values interpolated into a redirect path unvalidated | **Low**                 | Open, defence-in-depth                 |
+| 4   | Rate limiter fails open                                       | Info                    | Deliberate, documented                 |
+| 5   | `x-forwarded-for` trusted                                     | **Moderate** off Vercel | **Fixed** — `TRUSTED_CLIENT_IP_HEADER` |
+| 6   | Database role has full DDL rights                             | Info                    | Accepted                               |
 
 No high or critical findings. The classic web vulnerabilities — SQL injection,
 XSS, SSRF, secret leakage — are all closed, several of them structurally
@@ -127,9 +127,15 @@ rendering if it fails.
 - **Rate limiter fails open** (`lib/services/rate-limit.ts:58`). An unreachable
   counter allows the request. Deliberate and logged: it guards a budget, not a
   secret, and failing closed would take the site down when Neon hiccups.
-- **`x-forwarded-for` is trusted** (`lib/client-ip.ts`). Correct on Vercel,
-  which overwrites it. On a host that does not, a caller can choose their own
-  rate-limit bucket. Documented in the handoff.
+- **`x-forwarded-for` is trusted** (`lib/client-ip.ts`) — **fixed for
+  self-hosting.** A reverse proxy _appends_ to this header, so a caller who
+  sends `X-Forwarded-For: 1.2.3.4` occupies the left-most slot the code reads
+  and picks their own rate-limit bucket. Harmless on Vercel, which rewrites the
+  header; a real bypass behind nginx, Caddy, Traefik or Cloudflare, which is
+  where the app is now headed. `TRUSTED_CLIENT_IP_HEADER` names the one header
+  the edge controls (`cf-connecting-ip` behind Cloudflare) and, when set, is
+  read exclusively — falling back would restore the bypass. Six tests, one of
+  which sends a spoofed chain.
 - **The database role owns the schema.** The app writes, so read-only is not an
   option; a role without DDL rights would be an improvement if migrations were
   ever split from runtime. Low value while the entire database is a rebuildable

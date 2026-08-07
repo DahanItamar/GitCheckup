@@ -65,6 +65,13 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  /**
+   * Emits `.next/standalone` — a self-contained server with only the packages
+   * actually reached, rather than the whole `node_modules`. Needed to run this
+   * in a container of sensible size; Vercel ignores it.
+   */
+  output: "standalone",
+
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },

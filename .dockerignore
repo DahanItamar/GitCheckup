@@ -1,0 +1,13 @@
+# Everything the image must never contain, or does not need.
+.env
+.env.*
+!.env.example
+.git
+.github
+.next
+node_modules
+docs
+*.md
+.claude
+.vscode
+coverage
