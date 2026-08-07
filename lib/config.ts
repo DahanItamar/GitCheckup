@@ -20,9 +20,35 @@ import { z } from "zod";
  */
 export const DEMO_MODE = process.env.DEMO_MODE === "1";
 
-/** In demo mode a credential is never used, so it is never demanded. */
+/**
+ * In demo mode a credential is never used, so it is never demanded.
+ *
+ * `blankIsAbsent` matters more here than it looks. `.env.example` ships every
+ * credential with an empty value, and demo mode is reached by setting
+ * `DEMO_MODE=1` in that same file — so the common case is a blank
+ * `DATABASE_URL`, which is a string and therefore beats the placeholder
+ * default. `neon("")` then throws at import and the app dies on a route it
+ * never intended to reach the database from.
+ */
 const credential = (real: z.ZodType<string>, placeholder: string) =>
-  DEMO_MODE ? z.string().default(placeholder) : real;
+  DEMO_MODE ? blankIsAbsent(z.string().default(placeholder)) : real;
+
+/**
+ * Treats `FOO=` in a `.env` as "not set", which is what anyone writing it
+ * means.
+ *
+ * A key present with an empty value is a string, not `undefined`, so `.default()`
+ * never fires and `.optional()` rejects it. `.env.example` ships every optional
+ * key with an empty value — so `cp .env.example .env`, the setup step the
+ * README, CONTRIBUTING and the handoff all give, produced an app that refused
+ * to boot complaining about two variables the instructions never mentioned.
+ *
+ * Only for optional and defaulted values. The three credentials must still
+ * fail loudly when blank; that refusal is the point of this file.
+ */
+function blankIsAbsent<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((value) => (value === "" ? undefined : value), schema);
+}
 
 const envSchema = z.object({
   /** Fine-grained PAT: public repository read only, zero write scopes. */
@@ -55,10 +81,10 @@ const envSchema = z.object({
   ),
 
   /** v1 accepts exactly one provider. The seam exists; the choice does not. */
-  TIPS_PROVIDER: z.literal("rules").default("rules"),
+  TIPS_PROVIDER: blankIsAbsent(z.literal("rules").default("rules")),
 
-  NEXT_PUBLIC_SITE_URL: z.url().optional(),
-  VERCEL_PROJECT_PRODUCTION_URL: z.string().min(1).optional(),
+  NEXT_PUBLIC_SITE_URL: blankIsAbsent(z.url().optional()),
+  VERCEL_PROJECT_PRODUCTION_URL: blankIsAbsent(z.string().min(1).optional()),
 });
 
 /**
