@@ -21,8 +21,13 @@ export interface RepoSignals {
   forks: number;
   /** Includes open PRs — GitHub's own quirk, accepted (SPEC §8). */
   openIssues: number;
-  /** ISO 8601 UTC. */
-  pushedAt: string;
+  /**
+   * ISO 8601 UTC, or null when the repository has never been pushed to —
+   * an empty repo with no commits. Distinct from "pushed a long time ago":
+   * there is no push to judge, so the recency check scores it zero rather
+   * than crediting the creation date.
+   */
+  pushedAt: string | null;
   isArchived: boolean;
   isFork: boolean;
   hasIssuesEnabled: boolean;

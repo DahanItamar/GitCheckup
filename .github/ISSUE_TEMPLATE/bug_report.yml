@@ -1,0 +1,40 @@
+name: Bug report
+description: Something is broken that isn't a scoring disagreement
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce
+      description: Include the URL or repo slug if it is specific to one repo.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - The result page
+        - The share card (/api/og)
+        - The badge (/api/badge)
+        - The JSON API (/api/score)
+        - Trending
+        - Running it locally
+        - Somewhere else
+    validations:
+      required: true

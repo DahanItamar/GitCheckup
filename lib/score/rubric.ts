@@ -262,10 +262,12 @@ function atMost(
 }
 
 /**
- * An unparseable timestamp scores as ancient rather than throwing — a bad date
- * from upstream should cost points, not take down the page.
+ * A never-pushed repo, and an unparseable timestamp, both score as infinitely
+ * old. Absent data costs points; it does not take down the page.
  */
-function daysSince(isoTimestamp: string, now: Date): number {
+function daysSince(isoTimestamp: string | null, now: Date): number {
+  if (isoTimestamp === null) return Number.POSITIVE_INFINITY;
+
   const then = Date.parse(isoTimestamp);
   if (!Number.isFinite(then)) return Number.POSITIVE_INFINITY;
 

@@ -102,9 +102,11 @@ function identity(repo: GitHubRepoResponse) {
     stars: repo.stargazers_count,
     forks: repo.forks_count,
     openIssues: repo.open_issues_count,
-    // An empty repo has never been pushed to; its creation date is the honest
-    // answer and keeps the recency check from dividing by nothing.
-    pushedAt: repo.pushed_at ?? repo.created_at,
+    // GitHub returns null for a repo with no commits. Passing that through
+    // rather than substituting created_at is the difference between "we have
+    // no push to judge" and "pushed today" — the latter handed every empty
+    // repo full marks for recency.
+    pushedAt: repo.pushed_at,
     isArchived: repo.archived,
     isFork: repo.fork,
     hasIssuesEnabled: repo.has_issues,

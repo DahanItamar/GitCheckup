@@ -37,9 +37,8 @@ export const PERFECT: RepoSignals = {
 };
 
 /**
- * A repository with no commits at all. `pushedAt` falls back to the creation
- * date (see lib/github/signals.ts), which is why a brand-new empty repo still
- * scores full marks on recency.
+ * A repository with no commits at all. `pushedAt` is null — there is no push
+ * to judge, so recency scores zero rather than crediting the creation date.
  */
 export const EMPTY: RepoSignals = {
   ...PERFECT,
@@ -49,7 +48,7 @@ export const EMPTY: RepoSignals = {
   stars: 0,
   forks: 0,
   openIssues: 0,
-  pushedAt: "2026-08-06T00:00:00.000Z",
+  pushedAt: null,
   primaryLanguage: null,
   readmeBytes: null,
   hasLicense: false,

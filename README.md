@@ -24,22 +24,22 @@ purpose.
 
 ## Status
 
-**M1 complete.** You can paste a repo and get a real, live score with a full
-breakdown and ranked fixes.
+**All five milestones are written.** Paste a repo and you get a live score, a
+breakdown, ranked fixes, a share card, a badge, and a leaderboard.
 
-**M2–M4 are written; the database half is unproven.** The cache, the per-IP
-rate limit, `/trending`, the share card and the badge are all in place. Pure
-logic is covered by tests and the image routes were verified by rendering them,
-but **no SQL has yet run against a real Postgres**. Point `DATABASE_URL` at a
-Neon project and run `pnpm db:migrate` to find out.
+**One half of it is unproven: the database.** Pure logic is covered by 180
+tests, and the image routes were verified by rendering them and looking at the
+output — but **no SQL has ever run against a real Postgres**. The cache, the
+rate-limit counter and the trending query are all untested against a database.
+Point `DATABASE_URL` at a Neon project and run `pnpm db:migrate` to find out.
 
-| Milestone | What it adds                                   | State                              |
-| --------- | ---------------------------------------------- | ---------------------------------- |
-| M1        | A real score, live                             | ✅ done                            |
-| M2        | Neon cache, `/api/score`, instant repeat views | 🚧 code complete, needs a database |
-| M3        | OG share card, README embed snippets           | ✅ done                            |
-| M4        | Rate limiting, `/trending`, SVG badge          | ✅ done                            |
-| M5        | LICENSE, CI, dogfooding                        | next                               |
+| Milestone | What it adds                                   | State                                    |
+| --------- | ---------------------------------------------- | ---------------------------------------- |
+| M1        | A real score, live                             | ✅ done                                  |
+| M2        | Neon cache, `/api/score`, instant repeat views | 🚧 code complete, needs a database       |
+| M3        | OG share card, README embed snippets           | ✅ done                                  |
+| M4        | Rate limiting, `/trending`, SVG badge          | ✅ done                                  |
+| M5        | LICENSE, CI, dogfooding                        | ✅ done (dogfooding needs a public repo) |
 
 Full plan in [docs/SPEC.md](docs/SPEC.md).
 
@@ -73,7 +73,10 @@ that silently isn't caching, or a token that silently isn't raising the rate
 limit, fails mysteriously under load instead of obviously at startup. The
 startup error names the variable and links to where you get one.
 
-`RATE_LIMIT_SECRET` can be any random string for now; it is unused until M4.
+`RATE_LIMIT_SECRET` must be at least 16 characters. It is the HMAC key that
+hashes caller IP addresses before they reach the database — a guessable key
+makes those hashes reversible. Generate one with
+`node -e "console.log(crypto.randomUUID())"`.
 
 ---
 
@@ -97,13 +100,17 @@ Grades: **A+** ≥90 · **A** 80–89 · **B** 70–79 · **C** 60–69 · **D**
 The exact per-check weights are in [docs/SPEC.md §5](docs/SPEC.md) and
 implemented in [`lib/score/rubric.ts`](lib/score/rubric.ts).
 
-### Two things the score does not claim
+### Three things the score does not claim
 
 - **Popularity is scored but never advised on.** "Get more stars" is not an
   action anyone can take, so those checks are excluded from the fix list.
-- **The floor is around 24, not 0.** Any repo that exists and is not archived
-  starts with points for basic hygiene and a recent creation date. Treat the
-  scale as roughly 24–100.
+- **The floor is 14, not 0.** A repo that merely exists and is not archived
+  collects points for basic hygiene and for having no issue backlog to speak
+  of. Treat the scale as 14–100.
+- **A brand-new repo cannot score above ~85**, however well built, because 15
+  points are stars and forks. If you are judging "is this well made?" rather
+  than "should I adopt this?", read the category breakdown and ignore
+  popularity.
 
 ---
 
@@ -151,5 +158,10 @@ architecture and the rubric, and it explains why each constraint exists before
 you change it. If you change a rubric weight, bump `RUBRIC_VERSION` in
 [`lib/config.ts`](lib/config.ts) in the same commit.
 
-A LICENSE, CONTRIBUTING guide, and CI workflow land in M5 — at which point
-RepoGauge should score itself ≥90.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the enforced module
+boundaries, and the two rules for changing a rubric weight. Security reports go
+through [SECURITY.md](SECURITY.md), not public issues.
+
+## License
+
+[MIT](LICENSE).

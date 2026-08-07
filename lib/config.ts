@@ -96,5 +96,9 @@ export const COLD_SCORES_PER_HOUR = 30;
 /**
  * The rubric weights this build produces. Bumped in the same commit as any
  * weight change; a cached row at an older version is a cache miss (SPEC §8).
+ *
+ * 2 — a repo that has never been pushed to no longer scores full marks for
+ *     recency. It previously inherited its creation date, which handed every
+ *     empty repo 10 free points and lifted the bottom of the scale to 24.
  */
-export const RUBRIC_VERSION = 1;
+export const RUBRIC_VERSION = 2;

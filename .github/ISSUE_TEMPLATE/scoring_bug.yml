@@ -1,0 +1,44 @@
+name: Scoring looks wrong
+description: A repo scores higher or lower than it should
+labels: [rubric]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The rubric is deterministic, so anyone can reproduce your result from
+        the repo slug alone. The weights are in `docs/SPEC.md` §5.
+
+  - type: input
+    id: repo
+    attributes:
+      label: Repository
+      description: The owner/repo you scored.
+      placeholder: facebook/react
+    validations:
+      required: true
+
+  - type: input
+    id: actual
+    attributes:
+      label: Score you got
+      placeholder: "62"
+    validations:
+      required: true
+
+  - type: input
+    id: expected
+    attributes:
+      label: Score you expected
+      placeholder: "80 or so"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reasoning
+    attributes:
+      label: Which check is wrong, and why
+      description: >
+        Name the category or check if you can. "Docs is 12/25 but the README
+        is genuinely thorough" is far easier to act on than "the score is low".
+    validations:
+      required: true

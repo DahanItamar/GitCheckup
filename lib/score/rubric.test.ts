@@ -202,6 +202,14 @@ describe("activity — 20 pts", () => {
     ).toBe(expected);
   });
 
+  it("scores a repo that has never been pushed at zero, not as pushed today", () => {
+    // The bug this replaced: an empty repo inherited its creation date and
+    // collected 10 free points, lifting the bottom of the whole scale to 24.
+    expect(
+      checkPoints(scoreAt(signalsWith({ pushedAt: null })), "recent-push"),
+    ).toBe(0);
+  });
+
   it("scores an unparseable push date as ancient rather than throwing", () => {
     expect(
       checkPoints(
@@ -326,10 +334,25 @@ describe("whole-repo fixtures", () => {
   it("scores an empty repo low, without dividing or logging by zero", () => {
     const result = scoreAt(EMPTY);
     expect(Number.isFinite(result.total)).toBe(true);
-    expect(result.total).toBeLessThan(30);
     expect(result.grade).toBe("F");
     expect(categoryPoints(result, "docs")).toBe(0);
     expect(categoryPoints(result, "popularity")).toBe(0);
+  });
+
+  /**
+   * The bottom of the scale, pinned exactly. A repo that merely exists still
+   * collects points for three conditions that are true by default — not
+   * archived, not a fork, issues enabled — plus the issue-ratio pass that low
+   * star counts get for free. That is the floor, and it should not drift
+   * upward again without someone noticing.
+   */
+  it("puts the floor at 14, not 24", () => {
+    const result = scoreAt(EMPTY);
+
+    expect(result.total).toBe(14);
+    expect(checkPoints(result, "recent-push")).toBe(0);
+    expect(checkPoints(result, "issue-backlog")).toBe(4);
+    expect(categoryPoints(result, "hygiene")).toBe(10);
   });
 
   it("scores a well-built but abandoned repo on its documentation, not its pulse", () => {

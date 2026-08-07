@@ -1,9 +1,14 @@
 # RepoGauge — Technical Spec
 
-> Status: M1 built · 2026-08-07 · Spec version 1.1
+> Status: M1–M5 built · 2026-08-07 · Spec version 1.2
 >
-> Reconciled against the M1 implementation. Changes from 1.0 are marked
-> **[M1]** where the code taught us something the design got wrong.
+> Reconciled against the implementation as each milestone landed. Notes are
+> tagged **[M1]**–**[M5]** with the milestone that taught us the design was
+> wrong. Nothing below is aspirational unless it says so.
+>
+> **Unverified:** no SQL has ever run against a real Postgres. Everything in §5
+> below the domain types, and every query in `lib/db/`, is untested against a
+> database.
 
 ## 1. Problem & Users
 
@@ -279,7 +284,7 @@ export interface RepoSignals {
   stars: number;
   forks: number;
   openIssues: number; // includes open PRs — GitHub's own quirk, accepted (§8)
-  pushedAt: string; // ISO 8601 UTC
+  pushedAt: string | null; // [M5] ISO 8601 UTC; null = never pushed (no commits)
   isArchived: boolean;
   isFork: boolean;
   hasIssuesEnabled: boolean;
@@ -583,7 +588,7 @@ The 50-star floor is deliberate: without it, the leaderboard is whatever anyone 
 | Someone scripts `/api/score` across thousands of repos | Token budget gone in minutes                                                | Per-IP rate limit: **30 cold scores per hour** (cached reads are unlimited and don't count). Key is `hmac(ip, RATE_LIMIT_SECRET) + epoch hour`, one upsert per cold score.                                                                                     |
 | Repo renamed or transferred on GitHub                  | Two rows for one repo, split history                                        | `repos.github_id` is the unique identity. The upsert matches on `github_id` and overwrites `owner`/`name` with the canonical values the API returned.                                                                                                          |
 | User pastes `Facebook/React`                           | Duplicate row, duplicate cache miss                                         | Unique index on `(lower(owner), lower(name))`; lookups lowercase before querying. The page renders GitHub's canonical casing.                                                                                                                                  |
-| Repo has zero commits / is empty                       | Endpoints 3–6 all 404, division or log of zero                              | Only endpoint #1 is fatal. Every other signal degrades to its absent value; `log10(0 + 1) = 0` is well-defined. **[M1]** An empty repo scores **24**, not the low teens this row originally predicted — see the scale-floor note below.                        |
+| Repo has zero commits / is empty                       | Endpoints 3–6 all 404, division or log of zero                              | Only endpoint #1 is fatal. Every other signal degrades to its absent value; `log10(0 + 1) = 0` is well-defined. **[M5]** An empty repo scores **14** — the low teens this row predicted. It briefly scored 24; see the scale-floor note below.                 |
 | Repo has >100 commits in 90 days                       | Undercounts cadence                                                         | Accepted and documented: one page of 100 is requested and the cadence check saturates at 20. A second page would buy nothing.                                                                                                                                  |
 | `openIssues` includes open pull requests               | A busy repo looks like it has a backlog                                     | Accepted, documented in the check's tooltip. Separating them costs a search API call, which is rate-limited at 30/min — a worse trade.                                                                                                                         |
 | A GitHub call hangs                                    | The request hangs, then the Vercel function times out at 10s with no output | Every outbound call has `AbortSignal.timeout(5000)`. `Promise.allSettled` means one slow call can't block the other five. Worst case is 5s + scoring, inside the function limit.                                                                               |
@@ -593,31 +598,48 @@ The 50-star floor is deliberate: without it, the leaderboard is whatever anyone 
 | Two requests score the same cold repo simultaneously   | Two GitHub fan-outs, two `scores` rows                                      | Accepted. `scores` is append-only, so a duplicate row is harmless and the latest wins. Locking to save one duplicate fetch isn't worth the deadlock surface.                                                                                                   |
 | Unicode / very long owner or repo names                | Layout break in the OG card                                                 | `lib/repo-slug.ts` enforces GitHub's own rules: owner ≤39 chars matching `^[A-Za-z0-9](?:[A-Za-z0-9]\|-(?=[A-Za-z0-9])){0,38}$`, repo ≤100 chars matching `^[A-Za-z0-9._-]+$`. Anything else is `400` before a query runs. The card also truncates at render.  |
 
-### [M1] The scale's floor is ~24, not 0
+### [M5] The scale's floor is 14 — and 10 of the original 24 were a bug
 
-Measured, not predicted. A repository that merely exists — no README, no
-license, no description, no CI, zero commits — still collects:
+Measured, not predicted. This was originally recorded as an open calibration
+question with three options. It turned out to be mostly a defect, so it was
+fixed rather than decided.
 
-- **10 pts** for recency. With no commits, `pushed_at` is null and we fall back
-  to `created_at`, so a brand-new empty repo reads as "pushed today".
-- **4 pts** for `issue-backlog`, which returns full marks below 50 stars because
-  the ratio is noise there.
+**The defect.** `lib/github/signals.ts` substituted `created_at` when GitHub
+returned `pushed_at: null`, which it does for a repository with no commits.
+That handed every empty repo **10 of 10** for "pushed recently" — a repo that
+has never been pushed reading as pushed today. Passing the null through and
+scoring it zero is not a weight change; it is the check finally measuring what
+it claims to. `RUBRIC_VERSION` is 2 as a result.
+
+**What remains, and why it stays.** A repository that merely exists still
+collects 14:
+
+- **4 pts** for `issue-backlog`, which returns full marks below 50 stars
+  because the ratio is genuinely noise there — one filed issue on a 3-star repo
+  is not a backlog.
 - **10 pts** of hygiene for not being archived, not being a fork, and having
-  issues enabled — three conditions that are true by default.
+  issues enabled. These are true by default, but they are also real signals:
+  an archived repo, a fork, and a repo with issues switched off each deserve to
+  lose those points.
 
-Nothing here is a bug; each rule is defensible alone. The consequence is that
-**the usable range is roughly 24–100**, and a "30/100" reads as far worse than
-it is. Three ways out, none taken yet:
+So the usable range is 14–100 rather than 0–100. That is a deliberate property
+of an additive rubric, documented in the README, and not worth rescaling —
+rescaling would stop the category points summing to the headline number, which
+is the one thing that makes the breakdown checkable by eye.
 
-1. Accept it and say so in the UI ("24 is the floor"). Cheapest, currently what
-   the README does.
-2. Rescale the reported total from [24,100] to [0,100]. One line, but it makes
-   the category points stop summing to the headline number.
-3. Make the default-true hygiene checks worth less, and let recency score 0 for
-   a repo with no commits at all. Changes real weights — needs a
-   `RUBRIC_VERSION` bump.
+### [M5] The dogfooding target in M5 is unreachable for a new repository
 
-**Decide before M2 caches scores at the current weights.**
+Scoring itself with every M5 file in place, RepoGauge reaches **83 (A)**, not
+the ≥90 the milestone asks for. The gap is entirely `popularity`: 15 points of
+stars and forks that no amount of work on the repository can produce on day
+one. Reaching 90 needs roughly a thousand stars.
+
+That is worth knowing about the rubric itself, not just about this repo: **a
+flawless brand-new project cannot score above 85.** Whether that is correct
+depends on what the number is for. It is honest if the question is "should I
+adopt this?", and unfair if the question is "is this well built?". Left as
+designed for v1, recorded here so the trade-off is a choice rather than a
+surprise.
 
 ---
 
@@ -767,10 +789,24 @@ logged.
 **M5 — The README is the product page**
 End state: the repo alone sells it.
 
-- [ ] `README.md`: one-liner, demo GIF of the paste→score flow, both embed snippets, self-scored RepoGauge badge
-- [ ] `CLAUDE.md` pointing at this spec
-- [ ] GitHub Actions CI: format, lint, typecheck, test, `madge --circular`
-- [ ] LICENSE, CONTRIBUTING, SECURITY, `.github/workflows` — dogfood: RepoGauge should score itself ≥90
+- [~] `README.md`: one-liner, demo GIF of the paste→score flow, both embed snippets, self-scored RepoGauge badge — **written; the GIF and the self-scored badge need a deployment and a public repo**
+- [x] `CLAUDE.md` pointing at this spec
+- [x] GitHub Actions CI: format, lint, typecheck, test, `madge --circular`
+- [x] LICENSE, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, issue and PR templates, `.github/workflows`
+- [ ] Dogfood: RepoGauge should score itself ≥90 — **blocked, and unreachable as specified; see §8**
+
+**[M5] The repository is private, so RepoGauge cannot score itself at all.**
+The product reads public repositories only — that is the whole zero-permission
+posture from §2 — so dogfooding requires making this repo public first. That is
+a deliberate decision, not a formality, and it also gates the Camo verification
+M3 left open.
+
+**[M5] CI needs no secrets.** `format:check`, `lint`, `typecheck`, `test` and
+`deps:check` all run without touching GitHub or Postgres, because the rubric is
+a pure function and the tests never leave the process. `build` is deliberately
+not in CI: it imports `lib/config.ts`, which throws without a full environment,
+so putting it there would mean handing CI a token and a database URL to prove
+something the type checker already proved.
 
 ---
 
@@ -799,7 +835,9 @@ Numbered so any one can be rejected without reopening the rest.
 
 ## 12. Open Questions
 
-- **[M1] Does the ~24-point floor get fixed, and how?** The three options are in §8. Blocks: nothing technically, but M2 starts writing scores to a cache keyed by `rubric_version`, so deciding after that means a version bump and a cold cache rather than a free change. Needed by: M2.
+- ~~**[M1] Does the ~24-point floor get fixed, and how?**~~ **Resolved in M5.** It was mostly a defect rather than a calibration choice — see §8. The floor is now 14 and `RUBRIC_VERSION` is 2.
+- **[M5] Is 15 points of popularity right, when a flawless new repo cannot exceed 85?** Raised by dogfooding (§8). Blocks: nothing — but it decides whether the number answers "should I adopt this?" or "is this well built?", and those want different weights. Needed by: whenever real users disagree with a score.
+- **[M5] Does this repository become public?** Blocks: dogfooding, the self-scored badge, the demo GIF, and the Camo verification from M3. Nothing in the code depends on it.
 - **Production domain.** Blocks: the absolute URLs baked into README embed snippets, which are painful to change after people copy them. Needed by: M3. Until then `NEXT_PUBLIC_SITE_URL` falls back to the Vercel preview URL, so M1 and M2 are unblocked.
 - **Does `/trending` need a manual removal path?** The star floor plus the 7-day window is the v1 answer. If something objectionable clears 50 stars, the only recourse is a SQL delete. Blocks: nothing before launch. Revisit if it happens once.
 - **Should a repo's score be re-checked when someone views its badge weeks later?** Flow B deliberately says no, trading freshness for a bounded token budget. If badge staleness becomes the top complaint, the fix is a low-frequency refresh job for repos with embedded badges — which is the first thing in this design that would need a cron. Blocks: nothing in v1.
