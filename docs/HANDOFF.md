@@ -9,11 +9,10 @@ green, nothing pushed — the repository is still private.
 
 ## In one line
 
-All five milestones are built, and the app now **runs on real infrastructure**:
-a live GitHub token, a live Neon database, and a container on `srv1`
-(`<origin address, not published>`) behind nginx. It is deliberately **not yet public** — bound
-to loopback with no vhost — because it has no domain. That is the only
-remaining blocker.
+**GitCheckup is live at https://gitcheckup.com.** All five milestones built,
+running on real infrastructure: a live GitHub token, a live Neon database, and
+a container on `srv1` (`<origin address, not published>`) behind nginx with a Let's Encrypt
+certificate. Every gap the earlier handoffs listed as unproven is now closed.
 
 ---
 
