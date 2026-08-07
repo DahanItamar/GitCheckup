@@ -43,7 +43,16 @@ export async function GET(request: Request): Promise<Response> {
       resultUrl: `${SITE_URL}/r/${result.repo.owner}/${result.repo.name}`,
     });
 
-    return new Response(markdown, {
+    // A byte-order mark, because this response is a *file*.
+    //
+    // `charset=utf-8` on the header is correct and does nothing here: the
+    // Content-Disposition below saves the bytes to disk, and the header does
+    // not travel with them. A Windows editor then guesses, guesses Windows-1252,
+    // and renders every em dash as "â€"" — which makes a file whose entire job
+    // is to be read look broken. The BOM is the one signal that survives the
+    // download, and every consumer this file has — editors, and agents reading
+    // text — strips it.
+    return new Response(`﻿${markdown}`, {
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
         "Content-Disposition": `attachment; filename="${fixPlanFilename(result.repo.owner, result.repo.name)}"`,
