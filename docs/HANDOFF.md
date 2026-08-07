@@ -11,7 +11,7 @@ green, nothing pushed — the repository is still private.
 
 **GitCheckup is live at https://gitcheckup.com.** All five milestones built,
 running on real infrastructure: a live GitHub token, a live Neon database, and
-a container on `srv1` (`<origin address, not published>`) behind nginx with a Let's Encrypt
+a container behind nginx with a Let's Encrypt
 certificate. Every gap the earlier handoffs listed as unproven is now closed.
 
 ---
@@ -109,7 +109,7 @@ Two judgement calls worth revisiting if you disagree:
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------- |
 | ~~The `@neondatabase/serverless` HTTP driver~~ | **Closed.** Migrations applied and every query ran against real Neon, including the three raw-SQL paths           | —                |
 | ~~Live end-to-end with a real token~~          | **Closed.** Cold score 1.63s, cache hit 0.064s, against the live API                                              | —                |
-| The Docker image build                         | The image builds and runs on `srv1`; it has never been rebuilt from scratch on a clean host                       | Next deploy      |
+| The Docker image build                         | The image builds and runs on the host; it has never been rebuilt from scratch on a clean host                     | Next deploy      |
 | Anything behind a real domain                  | No vhost, no certificate, no Camo check yet                                                                       | A domain         |
 | README embed through GitHub's Camo proxy       | Needs a public URL — a `DEMO_MODE=1` deployment is enough, since Camo cannot tell a fixture score from a real one | First deployment |
 | GitCheckup scoring itself                      | The product reads public repos only, and this repo is **private**                                                 | Repo made public |
@@ -118,18 +118,25 @@ Two judgement calls worth revisiting if you disagree:
 
 ## Where it runs
 
-|                |                                                                      |
-| -------------- | -------------------------------------------------------------------- |
-| Host           | `srv1` — `<origin address, not published>`, Ubuntu 26.04, nginx + certbot at the edge |
-| Container      | `gitcheckup:latest`, `127.0.0.1:3000`, `restart: unless-stopped`     |
-| Source on host | `/opt/gitcheckup` (matches the `/opt/hewordle` convention)           |
-| Secrets        | `/opt/gitcheckup/.env.production`, mode 600, never in git            |
-| Database       | Neon, EU Central                                                     |
+Self-hosted behind Cloudflare: a Docker container on a small VPS, with nginx
+and certbot terminating TLS at the origin.
 
-Rebuild and restart:
+|                |                                                                           |
+| -------------- | ------------------------------------------------------------------------- |
+| Container      | `gitcheckup:latest`, bound to `127.0.0.1:3000`, `restart: unless-stopped` |
+| Source on host | `/opt/gitcheckup`                                                         |
+| Secrets        | `.env.production` beside it, mode 600, never in git                       |
+| Database       | Neon, EU Central                                                          |
+
+**The origin's hostname and address are deliberately not in this repository.**
+Cloudflare proxies the domain specifically so the origin is not reachable
+directly; publishing it here would undo that, letting anyone bypass both the
+proxy and `cf-connecting-ip`. They live in the private operator notes.
+
+Rebuild and restart, from the source directory on the host:
 
 ```bash
-ssh srv1 'cd /opt/gitcheckup && docker build -t gitcheckup:latest .   && docker rm -f gitcheckup   && docker run -d --name gitcheckup --restart unless-stopped        -p 127.0.0.1:3000:3000 --env-file /opt/gitcheckup/.env.production gitcheckup:latest'
+docker build -t gitcheckup:latest .   && docker rm -f gitcheckup   && docker run -d --name gitcheckup --restart unless-stopped        -p 127.0.0.1:3000:3000 --env-file .env.production gitcheckup:latest
 ```
 
 **Two traps for whoever wires the vhost.**
