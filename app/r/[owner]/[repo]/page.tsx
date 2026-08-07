@@ -11,10 +11,12 @@ import { RetryButton } from "@/components/RetryButton";
 import { ScoreDial } from "@/components/ScoreDial";
 import { TipList } from "@/components/TipList";
 import { clientIpFrom } from "@/lib/client-ip";
-import { SITE_URL } from "@/lib/config";
+import { DEMO_MODE, SITE_URL } from "@/lib/config";
 import { isRepoGaugeError } from "@/lib/errors";
 import { parseRepoSlug } from "@/lib/repo-slug";
 import { getOrComputeScore, type ScoredRepo } from "@/lib/services/score-repo";
+
+import { RescoreButton } from "./RescoreButton";
 
 /**
  * The result page, and the shareable URL (SPEC §7 Flow A step 3).
@@ -121,6 +123,10 @@ function Result({ result }: { result: ScoredRepo }) {
               {formatScoredAt(result.fetchedAt)}
             </time>
           </p>
+
+          {/* Hidden in demo mode: there is nothing to refresh from, so the
+              control would report success having changed nothing. */}
+          {!DEMO_MODE && <RescoreButton owner={repo.owner} name={repo.name} />}
         </div>
 
         <div className="shrink-0 self-center">
