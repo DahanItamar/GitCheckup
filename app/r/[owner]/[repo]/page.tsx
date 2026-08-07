@@ -76,7 +76,9 @@ function Result({ result }: { result: ScoredRepo }) {
           </a>
           <p className="mt-2 text-sm text-muted tabular-nums">
             {formatCount(repo.stars)} stars · scored{" "}
-            <time dateTime={result.fetchedAt}>just now</time>
+            <time dateTime={result.fetchedAt}>
+              {formatScoredAt(result.fetchedAt)}
+            </time>
           </p>
         </div>
 
@@ -104,4 +106,21 @@ function Result({ result }: { result: ScoredRepo }) {
 
 function formatCount(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
+}
+
+/**
+ * A cached score can be hours or days old, and after M2 most page views are
+ * cache hits — so "just now" would be wrong far more often than right.
+ */
+function formatScoredAt(iso: string): string {
+  const minutes = Math.floor((Date.now() - Date.parse(iso)) / 60_000);
+
+  if (minutes < 2) return "just now";
+  if (minutes < 60) return `${minutes} minutes ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours === 1 ? "an hour ago" : `${hours} hours ago`;
+
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "yesterday" : `${days} days ago`;
 }

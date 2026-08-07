@@ -16,8 +16,12 @@ const envSchema = z.object({
   /** HMAC key for hashing caller IPs before storage. Enforced from M4. */
   RATE_LIMIT_SECRET: z.string().min(1).optional(),
 
-  /** Neon connection string. Enforced from M2. */
-  DATABASE_URL: z.string().min(1).optional(),
+  /**
+   * Neon connection string. Required from M2 for the same reason as the
+   * token: a cache that silently isn't caching is exactly the "dies
+   * mysteriously under load" failure this app refuses to boot into.
+   */
+  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 
   /** v1 accepts exactly one provider. The seam exists; the choice does not. */
   TIPS_PROVIDER: z.literal("rules").default("rules"),
@@ -26,12 +30,28 @@ const envSchema = z.object({
   VERCEL_PROJECT_PRODUCTION_URL: z.string().min(1).optional(),
 });
 
+/**
+ * Zod names the variable but cannot say where to get one. Since this error is
+ * the first thing a new contributor sees, it carries the fix with it.
+ */
+const HINTS: Record<string, string> = {
+  GITHUB_TOKEN:
+    "Create a fine-grained PAT with public repository read access and zero write scopes: https://github.com/settings/personal-access-tokens",
+  DATABASE_URL:
+    "Create a free Postgres project at https://neon.tech, copy its connection string, then run: pnpm db:migrate",
+  RATE_LIMIT_SECRET: "Any long random string. Used to HMAC caller IPs.",
+};
+
 function loadEnv() {
   const parsed = envSchema.safeParse(process.env);
 
   if (!parsed.success) {
     const issues = parsed.error.issues
-      .map((issue) => `  ${issue.path.join(".")}: ${issue.message}`)
+      .map((issue) => {
+        const name = issue.path.join(".");
+        const hint = HINTS[name];
+        return `  ${name}: ${issue.message}${hint ? `\n    → ${hint}` : ""}`;
+      })
       .join("\n");
     throw new Error(
       `Invalid environment. Copy .env.example to .env and fill it in.\n${issues}`,

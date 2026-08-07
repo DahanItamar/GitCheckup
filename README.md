@@ -25,16 +25,20 @@ purpose.
 ## Status
 
 **M1 complete.** You can paste a repo and get a real, live score with a full
-breakdown and ranked fixes. There is no database yet, so every request is a cold
-fetch against the GitHub API — expect a couple of seconds.
+breakdown and ranked fixes.
 
-| Milestone | What it adds                                   | State   |
-| --------- | ---------------------------------------------- | ------- |
-| M1        | A real score, live                             | ✅ done |
-| M2        | Neon cache, `/api/score`, instant repeat views | next    |
-| M3        | OG share card, README embed snippets           | planned |
-| M4        | Rate limiting, `/trending`, SVG badge          | planned |
-| M5        | README, CI, dogfooding                         | planned |
+**M2 is written but unproven.** The Drizzle schema, the migration, every query,
+the fresh/stale/cold branches and `/api/score` are all in place and covered by
+tests where they can be — but no query has yet run against a real Postgres.
+Point `DATABASE_URL` at a Neon project and run `pnpm db:migrate` to find out.
+
+| Milestone | What it adds                                   | State                              |
+| --------- | ---------------------------------------------- | ---------------------------------- |
+| M1        | A real score, live                             | ✅ done                            |
+| M2        | Neon cache, `/api/score`, instant repeat views | 🚧 code complete, needs a database |
+| M3        | OG share card, README embed snippets           | planned                            |
+| M4        | Rate limiting, `/trending`, SVG badge          | planned                            |
+| M5        | README, CI, dogfooding                         | planned                            |
 
 Full plan in [docs/SPEC.md](docs/SPEC.md).
 
@@ -42,7 +46,7 @@ Full plan in [docs/SPEC.md](docs/SPEC.md).
 
 ## Running it
 
-You need Node 20+, pnpm, and a GitHub token.
+You need Node 20+, pnpm, a GitHub token, and a Postgres database.
 
 ```bash
 pnpm install
@@ -54,9 +58,19 @@ needs **public repository read access and zero write scopes** — nothing more.
 The token exists only to raise GitHub's rate ceiling from 60 requests/hour to
 5000; the app refuses to boot without one rather than silently degrading.
 
+You also need a `DATABASE_URL`. Create a free Postgres project at
+[neon.tech](https://neon.tech), paste its connection string into `.env`, then
+apply the schema:
+
 ```bash
+pnpm db:migrate
 pnpm dev          # http://localhost:3000
 ```
+
+The app refuses to boot without either variable, for the same reason: a cache
+that silently isn't caching, or a token that silently isn't raising the rate
+limit, fails mysteriously under load instead of obviously at startup. The
+startup error names the variable and links to where you get one.
 
 `RATE_LIMIT_SECRET` can be any random string for now; it is unused until M4.
 
@@ -120,7 +134,14 @@ pnpm typecheck     # tsc --noEmit, strict + noUncheckedIndexedAccess
 pnpm deps:check    # madge --circular
 pnpm build         # production build
 pnpm format        # prettier
+
+pnpm db:generate   # regenerate migration SQL after editing lib/db/schema.ts
+pnpm db:migrate    # apply committed migrations to DATABASE_URL
+pnpm db:studio     # browse the data
 ```
+
+Migrations under [`drizzle/`](drizzle/) are generated, committed, and never
+hand-edited.
 
 ## Contributing
 

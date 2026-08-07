@@ -671,11 +671,28 @@ without a cache: `loading.tsx` and `error.tsx`, which §10 assigns to M2.
 **M2 — Cache and persistence**
 End state: the second view of a repo is instant, and the same score survives a redeploy.
 
-- [ ] Neon project, `DATABASE_URL`, Drizzle schema for `repos` and `scores`, first migration committed
-- [ ] `lib/services/score-repo.ts` — the fresh / stale / cold branches from Flow A, including `rubric_version`
-- [ ] Stale-while-revalidate via `after()`
-- [ ] `GET /api/score` returning the JSON contract from §6
-- [ ] `loading.tsx` and `error.tsx` with the copy from Flow A's failure branches
+- [~] Neon project, `DATABASE_URL`, Drizzle schema for `repos` and `scores`, first migration committed — **schema and `drizzle/0000_init.sql` are written and committed; no Neon project exists yet, so the migration has never been applied**
+- [x] `lib/services/score-repo.ts` — the fresh / stale / cold branches from Flow A, including `rubric_version`
+- [x] Stale-while-revalidate via `after()`
+- [x] `GET /api/score` returning the JSON contract from §6
+- [x] `loading.tsx` and `error.tsx` with the copy from Flow A's failure branches _(landed early, in M1)_
+
+**[M2] What is and is not verified.** The freshness decision — the branch that
+determines whether a user waits on GitHub — is a pure function in
+`lib/services/freshness.ts` with 20 tests covering both sides of the 6-hour TTL
+and the 7-day ceiling, rubric-version mismatch in both directions, and clock
+skew. Everything else typechecks and builds, but **no query has ever run
+against a real Postgres**. Applying the migration and confirming one cold →
+fresh → stale round trip is the remaining M2 work, and it needs a
+`DATABASE_URL`.
+
+**[M2] Two failure paths the spec implied but did not spell out.**
+
+- **A cache read that throws is a miss, not an outage.** If Neon is unreachable, `getOrComputeScore` logs and falls through to the cold path, degrading to M1 behaviour rather than failing the page.
+- **A cache write that throws does not cost the user their score.** The score is already computed; the next request simply misses again.
+
+Both are logged to Vercel and invisible to the caller, which is the same
+posture §8 takes toward a degraded GitHub.
 
 **M3 — The share card**
 End state: pasting a result URL into Slack shows a card, and the README snippet works.

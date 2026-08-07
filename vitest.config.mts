@@ -10,6 +10,7 @@ export default defineConfig({
     env: {
       GITHUB_TOKEN: "test-token-not-used",
       RATE_LIMIT_SECRET: "test-secret-not-used",
+      DATABASE_URL: "postgresql://test@localhost:5432/not-connected",
     },
   },
   resolve: {
