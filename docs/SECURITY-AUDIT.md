@@ -21,7 +21,7 @@ assessment of the code and have not been exploited or disproved.
 
 | #   | Finding                                                       | Severity     | Status                              |
 | --- | ------------------------------------------------------------- | ------------ | ----------------------------------- |
-| 1   | No security response headers on any route                     | **Moderate** | Open                                |
+| 1   | No security response headers on any route                     | **Moderate** | **Fixed** in `next.config.ts`       |
 | 2   | `esbuild` advisory via `drizzle-kit` (dev only)               | **Low**      | Open, not exploitable in production |
 | 3   | Upstream values interpolated into a redirect path unvalidated | **Low**      | Open, defence-in-depth              |
 | 4   | Rate limiter fails open                                       | Info         | Deliberate, documented              |
@@ -34,7 +34,7 @@ rather than by care.
 
 ---
 
-## 1. No security response headers · Moderate · **measured**
+## 1. No security response headers · Moderate · **measured** · FIXED
 
 Every response, checked against the running server:
 
@@ -60,8 +60,24 @@ is about to become public, which is when they start mattering:
 - **`Strict-Transport-Security`** — Vercel terminates TLS, but HSTS is still
   worth declaring.
 
-**Fix:** a `headers()` block in `next.config.ts`. Roughly 20 lines, no
-runtime cost.
+**Fixed.** A `headers()` block in `next.config.ts` now sends all six on every
+route, verified live including `/api/og` and `/api/badge`. Every route still
+answers 200 and the card still renders as a valid PNG.
+
+`script-src` allows `'unsafe-inline'`, deliberately. Next inlines the RSC
+payload as `<script>self.__next_f.push(…)</script>` on every page; locking that
+down needs a per-request nonce, which needs middleware, which makes every route
+dynamic — and `/` and `/improved` are `revalidate = 300` precisely so the CDN
+absorbs their traffic instead of Neon. The absolute directives do the real work:
+`frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`,
+`form-action 'self'`, and every fetch/font/image origin pinned to this one. An
+injected `<script src="//evil">` fails; an injected inline handler would not.
+An honest bound rather than a complete one — the actual XSS defence remains
+that nothing renders attacker-controlled text.
+
+**Not verified in a browser.** CSP violations surface in the console, and this
+was checked with `curl`. Worth one pass over the landing page, a result page,
+Download card, Copy, and Rescore before launch.
 
 ## 2. `esbuild` advisory via `drizzle-kit` · Low · **measured**
 
