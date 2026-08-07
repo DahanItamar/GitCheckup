@@ -27,18 +27,19 @@ purpose.
 **M1 complete.** You can paste a repo and get a real, live score with a full
 breakdown and ranked fixes.
 
-**M2 is written but unproven.** The Drizzle schema, the migration, every query,
-the fresh/stale/cold branches and `/api/score` are all in place and covered by
-tests where they can be — but no query has yet run against a real Postgres.
-Point `DATABASE_URL` at a Neon project and run `pnpm db:migrate` to find out.
+**M2–M4 are written; the database half is unproven.** The cache, the per-IP
+rate limit, `/trending`, the share card and the badge are all in place. Pure
+logic is covered by tests and the image routes were verified by rendering them,
+but **no SQL has yet run against a real Postgres**. Point `DATABASE_URL` at a
+Neon project and run `pnpm db:migrate` to find out.
 
 | Milestone | What it adds                                   | State                              |
 | --------- | ---------------------------------------------- | ---------------------------------- |
 | M1        | A real score, live                             | ✅ done                            |
 | M2        | Neon cache, `/api/score`, instant repeat views | 🚧 code complete, needs a database |
-| M3        | OG share card, README embed snippets           | ✅ done (badge snippet awaits M4)  |
-| M4        | Rate limiting, `/trending`, SVG badge          | planned                            |
-| M5        | README, CI, dogfooding                         | planned                            |
+| M3        | OG share card, README embed snippets           | ✅ done                            |
+| M4        | Rate limiting, `/trending`, SVG badge          | ✅ done                            |
+| M5        | LICENSE, CI, dogfooding                        | next                               |
 
 Full plan in [docs/SPEC.md](docs/SPEC.md).
 

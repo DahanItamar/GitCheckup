@@ -6,6 +6,7 @@ import {
   userMessageFor,
   type RepoGaugeErrorCode,
 } from "@/lib/errors";
+import { clientIpFrom } from "@/lib/client-ip";
 import { parseRepoSlug } from "@/lib/repo-slug";
 import { getOrComputeScore } from "@/lib/services/score-repo";
 
@@ -27,7 +28,9 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const result = await getOrComputeScore(slug);
+    const result = await getOrComputeScore(slug, {
+      clientIp: clientIpFrom(request.headers),
+    });
 
     return NextResponse.json(result, {
       headers: {

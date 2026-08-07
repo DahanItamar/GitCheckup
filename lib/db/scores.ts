@@ -1,6 +1,6 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 
-import type { ScoreResult } from "@/lib/score/types";
+import type { Grade, ScoreResult } from "@/lib/score/types";
 
 import { db } from "./client";
 import { repos, scores } from "./schema";
@@ -125,6 +125,71 @@ async function upsertRepo(record: ScoreRecord): Promise<number> {
     throw new Error(`Upsert returned no row for github_id ${record.githubId}`);
   }
   return row.id;
+}
+
+export interface TrendingRepo {
+  owner: string;
+  name: string;
+  stars: number;
+  total: number;
+  grade: Grade;
+}
+
+/**
+ * Flow D: the latest score per repo inside a recent window, ranked.
+ *
+ * The star floor is deliberate. Without it the leaderboard is whatever anyone
+ * last pasted, including repos named to be seen on our homepage — a repo
+ * created to appear here would first need real stars (SPEC §9).
+ */
+export async function findTrending(options: {
+  limit: number;
+  windowDays: number;
+  minStars: number;
+  rubricVersion: number;
+  now?: Date;
+}): Promise<TrendingRepo[]> {
+  const now = options.now ?? new Date();
+  const since = new Date(
+    now.getTime() - options.windowDays * 24 * 60 * 60 * 1000,
+  );
+
+  // DISTINCT ON collapses each repo's history to its newest row before
+  // ranking, so a repo scored ten times does not appear ten times.
+  const latest = db
+    .selectDistinctOn([scores.repoId], {
+      owner: repos.owner,
+      name: repos.name,
+      stars: repos.stars,
+      total: scores.total,
+      grade: scores.grade,
+      repoId: scores.repoId,
+    })
+    .from(scores)
+    .innerJoin(repos, eq(scores.repoId, repos.id))
+    .where(
+      and(
+        gte(scores.fetchedAt, since),
+        gte(repos.stars, options.minStars),
+        eq(scores.rubricVersion, options.rubricVersion),
+      ),
+    )
+    .orderBy(scores.repoId, desc(scores.fetchedAt))
+    .as("latest");
+
+  const rows = await db
+    .select({
+      owner: latest.owner,
+      name: latest.name,
+      stars: latest.stars,
+      total: latest.total,
+      grade: latest.grade,
+    })
+    .from(latest)
+    .orderBy(desc(latest.total), desc(latest.stars))
+    .limit(options.limit);
+
+  return rows;
 }
 
 /** GitHub slugs are case-insensitive; repos_slug_idx indexes the same pair. */

@@ -13,8 +13,14 @@ const envSchema = z.object({
   /** Fine-grained PAT: public repository read only, zero write scopes. */
   GITHUB_TOKEN: z.string().min(1, "GITHUB_TOKEN is required"),
 
-  /** HMAC key for hashing caller IPs before storage. Enforced from M4. */
-  RATE_LIMIT_SECRET: z.string().min(1).optional(),
+  /**
+   * HMAC key for hashing caller IPs before storage. Required from M4: a
+   * predictable key would make the stored hashes reversible by anyone who
+   * can guess an IP, which is the whole point of hashing them.
+   */
+  RATE_LIMIT_SECRET: z
+    .string()
+    .min(16, "RATE_LIMIT_SECRET must be at least 16 characters"),
 
   /**
    * Neon connection string. Required from M2 for the same reason as the

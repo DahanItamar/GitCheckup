@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 import { CategoryBreakdown } from "@/components/CategoryBreakdown";
 import { EmbedSnippets } from "@/components/EmbedSnippets";
@@ -6,6 +7,7 @@ import { RepoError } from "@/components/RepoError";
 import { RepoInput } from "@/components/RepoInput";
 import { ScoreDial } from "@/components/ScoreDial";
 import { TipList } from "@/components/TipList";
+import { clientIpFrom } from "@/lib/client-ip";
 import { SITE_URL } from "@/lib/config";
 import { isRepoGaugeError } from "@/lib/errors";
 import { parseRepoSlug } from "@/lib/repo-slug";
@@ -66,7 +68,9 @@ export default async function ResultPage({ params }: RouteParams) {
 
   let result: ScoredRepo;
   try {
-    result = await getOrComputeScore(slug);
+    result = await getOrComputeScore(slug, {
+      clientIp: clientIpFrom(await headers()),
+    });
   } catch (error) {
     if (isRepoGaugeError(error)) {
       return (

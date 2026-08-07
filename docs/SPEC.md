@@ -729,11 +729,40 @@ the footer collided with the last tip, and tip text truncated mid-word with
 **M4 — Survive the spike**
 End state: someone can point a script at it and the token budget holds.
 
-- [ ] `rate_limit_hits` table and migration; HMAC-of-IP keying
-- [ ] 30-cold-scores-per-hour enforcement in `getOrComputeScore`, with `429` + `Retry-After`
-- [ ] GitHub 403/rate-limit detection and the degraded-serve path from §8
-- [ ] `/trending` and the landing "recently scored" strip, with the 50-star floor and the seeded fallback
-- [ ] `/api/badge` SVG
+- [x] `rate_limit_hits` table and migration; HMAC-of-IP keying
+- [x] 30-cold-scores-per-hour enforcement in `getOrComputeScore`, with `429` + `Retry-After`
+- [x] GitHub 403/rate-limit detection and the degraded-serve path from §8 — **verified against live GitHub, see below**
+- [x] `/trending` and the landing "recently scored" strip, with the 50-star floor and the seeded fallback
+- [x] `/api/badge` SVG
+
+**[M4] The §8 degraded path was verified for real, by accident.** Repeated
+unauthenticated verification traffic exhausted GitHub's 60/hr anonymous quota
+mid-session, which exercised the whole chain against the real API rather than
+a mock: a `403` carrying `x-ratelimit-remaining: 0` was detected as
+`RATE_LIMITED`, translated to `UPSTREAM_UNAVAILABLE` rather than blamed on the
+caller, and rendered as `repogauge | unknown` at **status 200** — not a broken
+image. Confirmed in the logs, end to end.
+
+**[M4] Two things the spec did not anticipate.**
+
+- **`/trending` and `/` are `revalidate = 300`, not static.** Both read the
+  database, and Next prerendered them at build time by default — which would
+  have frozen the leaderboard at whatever the database held during the build.
+  Five minutes keeps a newly scored repo appearing quickly while the CDN, not
+  Neon, absorbs the traffic.
+- **`lib/client-ip.ts` is new.** The limit is per-IP, but nothing below `app/`
+  may touch headers, so routes read the address and pass it into
+  `ScoreRepoOptions.clientIp`. Its contract depends on the host: on Vercel the
+  platform overwrites `x-forwarded-for` with the real connecting address, but
+  on a host that does not, callers can choose their own bucket. That
+  assumption is documented in the file.
+
+**[M4] Where the limiter fails open, deliberately.** An unknown IP is allowed
+through, because local development and server-side calls have no forwarded
+address and refusing them would break the app precisely where no budget is at
+risk. A counter that cannot reach Postgres also allows the request: a limiter
+protecting a budget should not take down the product it is protecting. Both are
+logged.
 
 **M5 — The README is the product page**
 End state: the repo alone sells it.

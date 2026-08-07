@@ -12,6 +12,7 @@ import type { ScoreResult } from "@/lib/score/types";
 import { getTipProvider } from "@/lib/tips";
 
 import { decideCacheAction } from "./freshness";
+import { chargeColdScore } from "./rate-limit";
 
 /**
  * The one orchestration seam (SPEC §6): cache lookup → freshness → fetch →
@@ -34,6 +35,13 @@ export interface ScoreRepoOptions {
    * on outbound calls.
    */
   neverRefresh?: boolean;
+
+  /**
+   * The caller's address, for the per-IP cold-score limit (SPEC §8). Routes
+   * read it from the request; nothing below this layer touches headers.
+   * Undefined means unknown, which is allowed through — see `chargeColdScore`.
+   */
+  clientIp?: string;
 }
 
 export interface ScoredRepo {
@@ -78,6 +86,10 @@ export async function getOrComputeScore(
     scheduleRefresh(slug);
     return serve(cached, { stale: true });
   }
+
+  // Only a cold score costs GitHub budget, so only a cold score is charged.
+  // This sits before the fetch and after every cache branch above it.
+  await chargeColdScore(options?.clientIp, now);
 
   return computeAndPersist(slug, now, cached);
 }

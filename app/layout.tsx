@@ -42,13 +42,15 @@ export default function RootLayout({
             >
               repo<span className="text-accent">gauge</span>
             </Link>
-            <a
-              href="https://github.com"
-              rel="noopener noreferrer"
-              className="text-xs text-muted transition-colors duration-150 hover:text-ink"
-            >
-              Public data only
-            </a>
+            <nav className="flex items-center gap-5 text-xs text-muted">
+              <Link
+                href="/trending"
+                className="transition-colors duration-150 hover:text-ink"
+              >
+                Trending
+              </Link>
+              <span className="text-faint">Public data only</span>
+            </nav>
           </div>
         </header>
 

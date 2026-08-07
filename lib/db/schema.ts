@@ -93,5 +93,22 @@ export const scores = pgTable(
   ],
 );
 
+/**
+ * The rate-limit counter (SPEC §5).
+ *
+ * Holds an HMAC of an IP and nothing else, for at most two hours. No raw IPs,
+ * no user identifiers — there is no PII in this database at all.
+ */
+export const rateLimitHits = pgTable(
+  "rate_limit_hits",
+  {
+    /** `<hmac(ip)>:<epoch_hour>`. */
+    bucketKey: text("bucket_key").primaryKey(),
+    hits: integer("hits").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [index("rate_limit_expiry_idx").on(table.expiresAt)],
+);
+
 export type RepoRow = typeof repos.$inferSelect;
 export type ScoreRow = typeof scores.$inferSelect;

@@ -16,14 +16,16 @@ export function EmbedSnippets({ owner, name, siteUrl }: EmbedSnippetsProps) {
   const slug = `${owner}/${name}`;
   const target = `${siteUrl}/r/${slug}`;
 
-  // The badge snippet from Flow C is deliberately absent: /api/badge does not
-  // exist until M4, and a copy-paste that 404s in someone's README is worse
-  // than one fewer option. It comes back with the route.
   const snippets = [
     {
       id: "card",
       label: "Card",
       markdown: `[![RepoGauge](${siteUrl}/api/og?repo=${slug})](${target})`,
+    },
+    {
+      id: "badge",
+      label: "Badge",
+      markdown: `[![RepoGauge](${siteUrl}/api/badge?repo=${slug})](${target})`,
     },
   ];
 
