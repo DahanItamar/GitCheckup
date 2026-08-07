@@ -1,10 +1,10 @@
-# RepoGauge
+# GitCheckup
 
 **Score any public GitHub repo out of 100 — in one paste, with zero permissions.**
 
 Deciding whether an unfamiliar repo is worth adopting means opening six tabs. Is
 there a LICENSE? Is it still maintained? Does CI run? Is the README more than a
-title? RepoGauge answers all of that with one number, the five categories behind
+title? GitCheckup answers all of that with one number, the five categories behind
 it, and a short list of what to fix — which you can download as a Markdown brief
 and hand straight to a coding agent.
 
@@ -17,7 +17,7 @@ popularity  15/15          popularity  15/15
 hygiene     20/20          hygiene     20/20
 ```
 
-Nothing to install, nothing to authorise, no account. RepoGauge reads public
+Nothing to install, nothing to authorise, no account. GitCheckup reads public
 GitHub metadata and nothing else — private repositories are out of scope on
 purpose.
 

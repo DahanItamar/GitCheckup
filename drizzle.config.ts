@@ -19,7 +19,7 @@ import { defineConfig } from "drizzle-kit";
 // driver" instead of naming the variable to set. Same empty-is-not-absent trap
 // as `lib/config.ts`.
 const PLACEHOLDER =
-  "postgresql://set-DATABASE_URL-in-dot-env@localhost:5432/repogauge";
+  "postgresql://set-DATABASE_URL-in-dot-env@localhost:5432/gitcheckup";
 
 const databaseUrl = process.env.DATABASE_URL || PLACEHOLDER;
 

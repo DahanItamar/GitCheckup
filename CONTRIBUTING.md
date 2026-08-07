@@ -1,4 +1,4 @@
-# Contributing to RepoGauge
+# Contributing to GitCheckup
 
 Thanks for looking. This project is small and opinionated, and most of those
 opinions are written down — so the fastest way to have a change accepted is to

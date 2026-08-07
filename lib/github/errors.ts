@@ -1,6 +1,6 @@
 /**
  * Typed failures from the GitHub layer. `lib/services/` is what translates
- * these into the `RepoGaugeError` codes that routes and pages understand —
+ * these into the `GitCheckupError` codes that routes and pages understand —
  * nothing above this layer sees an HTTP status or a GitHub response body.
  */
 

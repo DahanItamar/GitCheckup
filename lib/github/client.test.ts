@@ -63,7 +63,7 @@ describe("the request it sends", () => {
     expect(headers.Authorization).toBe(`Bearer ${TOKEN}`);
     expect(headers.Accept).toBe("application/vnd.github+json");
     expect(headers["X-GitHub-Api-Version"]).toBe("2022-11-28");
-    expect(headers["User-Agent"]).toContain("RepoGauge");
+    expect(headers["User-Agent"]).toContain("GitCheckup");
   });
 
   it("points GitHub at the configured site, not at a hardcoded repo", async () => {
@@ -77,7 +77,7 @@ describe("the request it sends", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const agent = (init.headers as Record<string, string>)["User-Agent"];
 
-    expect(agent).toBe(`RepoGauge (+${SITE_URL})`);
+    expect(agent).toBe(`GitCheckup (+${SITE_URL})`);
     expect(agent).not.toContain("github.com/");
   });
 

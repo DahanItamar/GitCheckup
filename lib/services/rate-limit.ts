@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 
 import { COLD_SCORES_PER_HOUR, RATE_LIMIT_SECRET } from "@/lib/config";
 import { recordHit } from "@/lib/db/rate-limit";
-import { RepoGaugeError } from "@/lib/errors";
+import { GitCheckupError } from "@/lib/errors";
 
 /**
  * Per-IP throttling of cold scores (SPEC §8).
@@ -60,7 +60,7 @@ export async function chargeColdScore(
   }
 
   if (hits > COLD_SCORES_PER_HOUR) {
-    throw new RepoGaugeError("RATE_LIMITED", {
+    throw new GitCheckupError("RATE_LIMITED", {
       retryAfterSeconds: secondsUntilReset(now),
     });
   }

@@ -1,6 +1,6 @@
 # Handoff — 2026-08-07
 
-Where RepoGauge stands, what is proven, and what to do next. Written at commit
+Where GitCheckup stands, what is proven, and what to do next. Written at commit
 `0fa8233` on `main`, after the M5 follow-up session: demo mode, the fix plan,
 the interface pass, and a test for the GitHub client. 338 tests, all gates
 green, nothing pushed — the repository is still private.
@@ -113,7 +113,7 @@ Two judgement calls worth revisiting if you disagree:
 | The Docker image build                         | The image builds and runs on `srv1`; it has never been rebuilt from scratch on a clean host                       | Next deploy      |
 | Anything behind a real domain                  | No vhost, no certificate, no Camo check yet                                                                       | A domain         |
 | README embed through GitHub's Camo proxy       | Needs a public URL — a `DEMO_MODE=1` deployment is enough, since Camo cannot tell a fixture score from a real one | First deployment |
-| RepoGauge scoring itself                       | The product reads public repos only, and this repo is **private**                                                 | Repo made public |
+| GitCheckup scoring itself                      | The product reads public repos only, and this repo is **private**                                                 | Repo made public |
 
 ---
 
@@ -122,20 +122,20 @@ Two judgement calls worth revisiting if you disagree:
 |                |                                                                      |
 | -------------- | -------------------------------------------------------------------- |
 | Host           | `srv1` — `<origin address, not published>`, Ubuntu 26.04, nginx + certbot at the edge |
-| Container      | `repogauge:latest`, `127.0.0.1:3000`, `restart: unless-stopped`      |
-| Source on host | `/opt/repogauge` (matches the `/opt/hewordle` convention)            |
-| Secrets        | `/opt/repogauge/.env.production`, mode 600, never in git             |
+| Container      | `gitcheckup:latest`, `127.0.0.1:3000`, `restart: unless-stopped`     |
+| Source on host | `/opt/gitcheckup` (matches the `/opt/hewordle` convention)           |
+| Secrets        | `/opt/gitcheckup/.env.production`, mode 600, never in git            |
 | Database       | Neon, EU Central                                                     |
 
 Rebuild and restart:
 
 ```bash
-ssh srv1 'cd /opt/repogauge && docker build -t repogauge:latest .   && docker rm -f repogauge   && docker run -d --name repogauge --restart unless-stopped        -p 127.0.0.1:3000:3000 --env-file /opt/repogauge/.env.production repogauge:latest'
+ssh srv1 'cd /opt/gitcheckup && docker build -t gitcheckup:latest .   && docker rm -f gitcheckup   && docker run -d --name gitcheckup --restart unless-stopped        -p 127.0.0.1:3000:3000 --env-file /opt/gitcheckup/.env.production gitcheckup:latest'
 ```
 
 **Two traps for whoever wires the vhost.**
 
-_Do not_ `include snippets/security-headers.conf` in the RepoGauge vhost. Its
+_Do not_ `include snippets/security-headers.conf` in the GitCheckup vhost. Its
 CSP sets `script-src 'self'` with no `'unsafe-inline'`; browsers enforce the
 intersection of multiple CSP headers, so it would override the app's own,
 block Next's inline hydration script, and leave a page that returns 200 and
@@ -152,7 +152,7 @@ your own `X-Forwarded-For`.
 
 **1. Is 15 points of popularity right?** A flawless brand-new repository cannot
 score above ~85, because 15 points are stars and forks that no amount of work
-produces on day one. Scoring itself with every M5 file in place, RepoGauge
+produces on day one. Scoring itself with every M5 file in place, GitCheckup
 reaches 83 — so M5's own "≥90" target is unreachable as specified. This decides
 whether the number answers _"should I adopt this?"_ (current weighting is
 honest) or _"is this well built?"_ (current weighting is unfair). See §8.

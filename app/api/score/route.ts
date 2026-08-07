@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 
 import {
   HTTP_STATUS,
-  isRepoGaugeError,
+  isGitCheckupError,
   userMessageFor,
-  type RepoGaugeErrorCode,
+  type GitCheckupErrorCode,
 } from "@/lib/errors";
 import { clientIpFrom } from "@/lib/client-ip";
 import { parseRepoSlug } from "@/lib/repo-slug";
@@ -38,7 +38,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       },
     });
   } catch (error) {
-    if (isRepoGaugeError(error)) {
+    if (isGitCheckupError(error)) {
       return errorResponse(error.code, error.retryAfterSeconds);
     }
 
@@ -50,7 +50,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
 /** Uniform error body (SPEC §6): `{ error: { code, message } }`. */
 function errorResponse(
-  code: RepoGaugeErrorCode,
+  code: GitCheckupErrorCode,
   retryAfterSeconds?: number,
 ): NextResponse {
   const headers = new Headers();

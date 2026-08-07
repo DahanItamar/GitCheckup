@@ -15,7 +15,7 @@ import { ScoreSparkline } from "@/components/ScoreSparkline";
 import { TipList } from "@/components/TipList";
 import { clientIpFrom } from "@/lib/client-ip";
 import { DEMO_MODE, SITE_URL } from "@/lib/config";
-import { isRepoGaugeError } from "@/lib/errors";
+import { isGitCheckupError } from "@/lib/errors";
 import { parseRepoSlug } from "@/lib/repo-slug";
 import {
   getScoreHistory,
@@ -48,13 +48,13 @@ export async function generateMetadata({
   // itself rather than trusting a query parameter (SPEC §3). Scoring here as
   // well as in the page would double the GitHub fan-out for no gain.
   const image = `${SITE_URL}/api/og?repo=${encodeURIComponent(label)}`;
-  const description = `RepoGauge score for ${label} — docs, community, activity, popularity and hygiene, out of 100.`;
+  const description = `GitCheckup score for ${label} — docs, community, activity, popularity and hygiene, out of 100.`;
 
   return {
     title: label,
     description,
     openGraph: {
-      title: `${label} · RepoGauge`,
+      title: `${label} · GitCheckup`,
       description,
       url: `${SITE_URL}/r/${label}`,
       images: [{ url: image, width: 1200, height: 630 }],
@@ -62,7 +62,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: `${label} · RepoGauge`,
+      title: `${label} · GitCheckup`,
       description,
       images: [image],
     },
@@ -84,7 +84,7 @@ export default async function ResultPage({ params }: RouteParams) {
       clientIp: clientIpFrom(await headers()),
     });
   } catch (error) {
-    if (isRepoGaugeError(error)) {
+    if (isGitCheckupError(error)) {
       // A rate limit refills and an upstream outage ends, so both get a way to
       // try this repo again. A missing repo does not — offering a retry there
       // would invite someone to hammer a slug that will never resolve.

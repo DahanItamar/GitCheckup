@@ -8,7 +8,7 @@ import { gradeChip, gradeColor } from "@/components/grade-color";
 import { RepoError } from "@/components/RepoError";
 import { clientIpFrom } from "@/lib/client-ip";
 import { SITE_URL } from "@/lib/config";
-import { isRepoGaugeError } from "@/lib/errors";
+import { isGitCheckupError } from "@/lib/errors";
 import { parseRepoSlug } from "@/lib/repo-slug";
 import { compareRepos, type Comparison } from "@/lib/services/compare";
 import type { ScoredRepo } from "@/lib/services/score-repo";
@@ -44,13 +44,13 @@ export async function generateMetadata({
 }: RouteParams): Promise<Metadata> {
   const p = await params;
   const title = `${p.ownerA}/${p.repoA} vs ${p.ownerB}/${p.repoB}`;
-  const description = `RepoGauge compares ${title} across docs, community, activity, popularity and hygiene.`;
+  const description = `GitCheckup compares ${title} across docs, community, activity, popularity and hygiene.`;
 
   return {
     title,
     description,
     openGraph: {
-      title: `${title} · RepoGauge`,
+      title: `${title} · GitCheckup`,
       description,
       url: `${SITE_URL}${pathOf(p)}`,
       type: "website",
@@ -73,7 +73,7 @@ export default async function ComparePage({ params }: RouteParams) {
       clientIp: clientIpFrom(await headers()),
     });
   } catch (error) {
-    if (isRepoGaugeError(error)) {
+    if (isGitCheckupError(error)) {
       return (
         <RepoError
           code={error.code}

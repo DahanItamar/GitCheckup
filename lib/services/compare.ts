@@ -1,4 +1,4 @@
-import { RepoGaugeError } from "@/lib/errors";
+import { GitCheckupError } from "@/lib/errors";
 import type { RepoSlug } from "@/lib/repo-slug";
 
 import { getOrComputeScore, type ScoredRepo } from "./score-repo";
@@ -27,7 +27,7 @@ export async function compareRepos(
   options: { clientIp?: string } = {},
 ): Promise<Comparison> {
   if (sameRepo(a, b)) {
-    throw new RepoGaugeError("INVALID_SLUG", {
+    throw new GitCheckupError("INVALID_SLUG", {
       cause: new Error("a repository cannot be compared with itself"),
     });
   }

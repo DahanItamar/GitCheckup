@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# RepoGauge as a container, for a host that is not Vercel.
+# GitCheckup as a container, for a host that is not Vercel.
 #
 # Three stages so the runtime image carries no package manager, no sources and
 # no build cache: only the standalone server Next emits, its static assets, and

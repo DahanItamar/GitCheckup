@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
 import { clientIpFrom } from "@/lib/client-ip";
-import { isRepoGaugeError, userMessageFor } from "@/lib/errors";
+import { isGitCheckupError, userMessageFor } from "@/lib/errors";
 import { parseRepoSlug, slugPath } from "@/lib/repo-slug";
 import { getOrComputeScore } from "@/lib/services/score-repo";
 
@@ -46,7 +46,7 @@ export async function rescore(
       clientIp: clientIpFrom(await headers()),
     });
   } catch (error) {
-    if (isRepoGaugeError(error)) return { error: userMessageFor(error.code) };
+    if (isGitCheckupError(error)) return { error: userMessageFor(error.code) };
 
     // Same rule as the routes: the detail goes to the logs, never the screen.
     console.error("[rescore] unhandled failure", error);

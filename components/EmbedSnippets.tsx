@@ -23,12 +23,12 @@ export function EmbedSnippets({ owner, name, siteUrl }: EmbedSnippetsProps) {
     {
       id: "card",
       label: "Card",
-      markdown: `[![RepoGauge](${siteUrl}/api/og?repo=${slug})](${target})`,
+      markdown: `[![GitCheckup](${siteUrl}/api/og?repo=${slug})](${target})`,
     },
     {
       id: "badge",
       label: "Badge",
-      markdown: `[![RepoGauge](${siteUrl}/api/badge?repo=${slug})](${target})`,
+      markdown: `[![GitCheckup](${siteUrl}/api/badge?repo=${slug})](${target})`,
     },
   ];
 
@@ -135,7 +135,7 @@ function DownloadPng({ owner, name, siteUrl }: EmbedSnippetsProps) {
       // looks exactly like a success until someone opens the file.
       if (!response.ok) throw new Error(`card responded ${response.status}`);
 
-      saveBlob(await response.blob(), `RepoGauge-${owner}-${name}.png`);
+      saveBlob(await response.blob(), `GitCheckup-${owner}-${name}.png`);
       setState("idle");
     } catch {
       setState("failed");

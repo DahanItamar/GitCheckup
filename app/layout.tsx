@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "RepoGauge — score any GitHub repo out of 100",
-    template: "%s · RepoGauge",
+    default: "GitCheckup — score any GitHub repo out of 100",
+    template: "%s · GitCheckup",
   },
   description:
     "Paste a GitHub repo and get a 0–100 score, a five-category breakdown, and a list of concrete fixes. Public data only, no permissions asked.",
@@ -56,7 +56,7 @@ export default function RootLayout({
               href="/"
               className="font-mono text-sm font-medium tracking-tight"
             >
-              repo<span className="text-accent">gauge</span>
+              git<span className="text-accent">checkup</span>
             </Link>
             <nav className="flex items-center gap-5 text-xs text-muted">
               <Link
@@ -74,7 +74,7 @@ export default function RootLayout({
 
         <footer className="border-t border-border">
           <div className="mx-auto max-w-3xl px-6 py-6 text-xs text-faint">
-            RepoGauge reads public GitHub metadata. It never asks for
+            GitCheckup reads public GitHub metadata. It never asks for
             permissions and cannot see private repositories.
           </div>
         </footer>

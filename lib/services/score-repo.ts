@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { DEMO_MODE, RUBRIC_VERSION } from "@/lib/config";
 import { findDemoSignals } from "@/lib/demo/repos";
 import { findLatestScore, saveScore, type CachedScore } from "@/lib/db/scores";
-import { RepoGaugeError } from "@/lib/errors";
+import { GitCheckupError } from "@/lib/errors";
 import { GitHubError } from "@/lib/github/errors";
 import { fetchRepoSignals } from "@/lib/github/signals";
 import type { RepoSignals } from "@/lib/github/types";
@@ -108,7 +108,7 @@ export async function getOrComputeScore(
  */
 async function demoScore(slug: RepoSlug, now: Date): Promise<ScoredRepo> {
   const signals = findDemoSignals(slug, now);
-  if (signals === null) throw new RepoGaugeError("REPO_NOT_FOUND");
+  if (signals === null) throw new GitCheckupError("REPO_NOT_FOUND");
 
   return {
     repo: { owner: signals.owner, name: signals.name, stars: signals.stars },
@@ -196,7 +196,7 @@ function degradeOrThrow(
     );
     return serve(fallback, { stale: true });
   }
-  throw toRepoGaugeError(cause);
+  throw toGitCheckupError(cause);
 }
 
 /* -------------------------------------------------------------------------
@@ -250,13 +250,13 @@ function scheduleRefresh(slug: RepoSlug): void {
  * Errors
  * ---------------------------------------------------------------------- */
 
-function toRepoGaugeError(cause: unknown): RepoGaugeError {
+function toGitCheckupError(cause: unknown): GitCheckupError {
   if (!(cause instanceof GitHubError)) {
-    return new RepoGaugeError("UPSTREAM_UNAVAILABLE", { cause });
+    return new GitCheckupError("UPSTREAM_UNAVAILABLE", { cause });
   }
 
   if (cause.code === "NOT_FOUND") {
-    return new RepoGaugeError("REPO_NOT_FOUND", { cause });
+    return new GitCheckupError("REPO_NOT_FOUND", { cause });
   }
 
   // A spent GitHub budget is our problem, not the caller's: RATE_LIMITED is
@@ -266,5 +266,5 @@ function toRepoGaugeError(cause: unknown): RepoGaugeError {
   // visitor cannot act on our expired token, and telling them the operator
   // misconfigured the site would be honest but useless. The distinction is
   // preserved in `cause` and shouted in the log, where it can be acted on.
-  return new RepoGaugeError("UPSTREAM_UNAVAILABLE", { cause });
+  return new GitCheckupError("UPSTREAM_UNAVAILABLE", { cause });
 }

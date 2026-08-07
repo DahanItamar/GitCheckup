@@ -57,9 +57,9 @@ describe("an empty value means unset", () => {
 
   it("still honours a value that is actually set", async () => {
     vi.stubEnv("DEMO_MODE", "1");
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://repogauge.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://gitcheckup.app");
 
-    expect((await loadConfig()).SITE_URL).toBe("https://repogauge.app");
+    expect((await loadConfig()).SITE_URL).toBe("https://gitcheckup.app");
   });
 
   it("does not extend the same mercy to a credential", async () => {

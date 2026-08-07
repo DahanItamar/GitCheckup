@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { RepoGaugeError } from "@/lib/errors";
+import { GitCheckupError } from "@/lib/errors";
 import { assertRepoSlug, parseRepoSlug, slugKey } from "@/lib/repo-slug";
 
 const REACT = { owner: "facebook", name: "react" };
@@ -162,12 +162,12 @@ describe("assertRepoSlug", () => {
   });
 
   it("throws INVALID_SLUG for anything else", () => {
-    expect(() => assertRepoSlug("not a repo")).toThrowError(RepoGaugeError);
+    expect(() => assertRepoSlug("not a repo")).toThrowError(GitCheckupError);
     try {
       assertRepoSlug("not a repo");
       expect.unreachable();
     } catch (error) {
-      expect((error as RepoGaugeError).code).toBe("INVALID_SLUG");
+      expect((error as GitCheckupError).code).toBe("INVALID_SLUG");
     }
   });
 });

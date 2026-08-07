@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# RepoGauge
+# GitCheckup
 
 **Read [docs/SPEC.md](docs/SPEC.md) before changing anything.** It is the source
 of truth for the architecture, the rubric weights, the dependency direction

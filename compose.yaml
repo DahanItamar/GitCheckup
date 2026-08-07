@@ -1,4 +1,4 @@
-# RepoGauge on a host you own.
+# GitCheckup on a host you own.
 #
 # Bound to 127.0.0.1 on purpose: the container is not the edge. Your existing
 # reverse proxy terminates TLS and forwards to it, which is also what makes
@@ -7,9 +7,9 @@
 #   docker compose up -d --build
 #
 services:
-  repogauge:
+  gitcheckup:
     build: .
-    image: repogauge:latest
+    image: gitcheckup:latest
     restart: unless-stopped
     # Change the left-hand port if 3000 is taken by something already running.
     ports:

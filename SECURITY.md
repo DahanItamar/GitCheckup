@@ -17,7 +17,7 @@ disclosing publicly.
 
 ## What is in scope
 
-RepoGauge is a public, unauthenticated web application. There are no accounts,
+GitCheckup is a public, unauthenticated web application. There are no accounts,
 no sessions, and no user-owned data, so the interesting surfaces are narrow:
 
 - **SSRF.** The app fetches URLs on a user's behalf. The base URL is a

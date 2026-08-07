@@ -1,6 +1,6 @@
 # Security audit — 2026-08-07
 
-Audit of RepoGauge at commit `69e6ec2`, 91 source files, running against a
+Audit of GitCheckup at commit `69e6ec2`, 91 source files, running against a
 live Neon database and a live GitHub token.
 
 **How this was produced.** `pnpm audit` for dependencies, live HTTP response

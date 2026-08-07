@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { userMessageFor, type RepoGaugeErrorCode } from "@/lib/errors";
+import { userMessageFor, type GitCheckupErrorCode } from "@/lib/errors";
 
 /**
  * Typed error → user-facing copy (SPEC §7 Flow A failure branches).
@@ -12,12 +12,12 @@ import { userMessageFor, type RepoGaugeErrorCode } from "@/lib/errors";
  * unexpected.
  */
 interface RepoErrorProps {
-  code: RepoGaugeErrorCode;
+  code: GitCheckupErrorCode;
   retryAfterSeconds?: number | undefined;
   action?: React.ReactNode;
 }
 
-const HEADING: Record<RepoGaugeErrorCode, string> = {
+const HEADING: Record<GitCheckupErrorCode, string> = {
   INVALID_SLUG: "That isn't a repo",
   REPO_NOT_FOUND: "No such repo",
   RATE_LIMITED: "Slow down a moment",

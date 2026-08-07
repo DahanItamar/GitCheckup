@@ -37,7 +37,7 @@ export interface FixPlanInput {
 
 /** `owner-name`, safe as a filename because the slug charset already is. */
 export function fixPlanFilename(owner: string, name: string): string {
-  return `repogauge-${owner}-${name}.md`;
+  return `gitcheckup-${owner}-${name}.md`;
 }
 
 export function renderFixPlan(input: FixPlanInput): string {
@@ -46,7 +46,7 @@ export function renderFixPlan(input: FixPlanInput): string {
   const reachable = score.total + gap.actionable;
 
   return [
-    `# RepoGauge fix plan — ${owner}/${name}`,
+    `# GitCheckup fix plan — ${owner}/${name}`,
     "",
     `**${score.total}/100 · grade ${score.grade}** · rubric v${input.rubricVersion} · scored ${input.fetchedAt}`,
     "",
@@ -74,7 +74,7 @@ function briefing(): string {
     "",
     "## How to use this file",
     "",
-    "You are raising this repository's RepoGauge score. RepoGauge reads public",
+    "You are raising this repository's GitCheckup score. GitCheckup reads public",
     "GitHub metadata only — it never sees the source — so every item below is",
     "satisfied by a file, a repository setting, or a commit.",
     "",

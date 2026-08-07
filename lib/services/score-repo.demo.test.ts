@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { isRepoGaugeError } from "@/lib/errors";
+import { isGitCheckupError } from "@/lib/errors";
 import { assertRepoSlug } from "@/lib/repo-slug";
 
 /**
@@ -72,8 +72,8 @@ describe("getOrComputeScore in demo mode", () => {
       assertRepoSlug("torvalds/linux"),
     ).catch((error: unknown) => error);
 
-    expect(isRepoGaugeError(failure)).toBe(true);
-    expect(isRepoGaugeError(failure) && failure.code).toBe("REPO_NOT_FOUND");
+    expect(isGitCheckupError(failure)).toBe(true);
+    expect(isGitCheckupError(failure) && failure.code).toBe("REPO_NOT_FOUND");
   });
 
   it("ignores neverRefresh, having nothing to refresh from", async () => {

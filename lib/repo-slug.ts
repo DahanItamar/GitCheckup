@@ -1,4 +1,4 @@
-import { RepoGaugeError } from "@/lib/errors";
+import { GitCheckupError } from "@/lib/errors";
 
 /**
  * Parses and validates `owner/repo` out of every input form the product
@@ -50,10 +50,10 @@ export function parseRepoSlug(input: string): RepoSlug | null {
   return { owner, name };
 }
 
-/** Throws `RepoGaugeError('INVALID_SLUG')` rather than returning null. */
+/** Throws `GitCheckupError('INVALID_SLUG')` rather than returning null. */
 export function assertRepoSlug(input: string): RepoSlug {
   const slug = parseRepoSlug(input);
-  if (slug === null) throw new RepoGaugeError("INVALID_SLUG");
+  if (slug === null) throw new GitCheckupError("INVALID_SLUG");
   return slug;
 }
 

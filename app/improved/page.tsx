@@ -15,7 +15,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Most improved",
   description:
-    "Public repositories that gained the most RepoGauge points recently.",
+    "Public repositories that gained the most GitCheckup points recently.",
 };
 
 export default async function ImprovedPage() {
@@ -86,7 +86,7 @@ function EmptyBoard({
     <div className="rounded-xl border border-border bg-surface px-5 py-5 shadow-rest">
       <h2 className="text-sm font-medium">Nothing has moved yet</h2>
       <p className="mt-2 text-sm leading-relaxed text-muted">
-        A repository appears here once RepoGauge has seen it twice and the
+        A repository appears here once GitCheckup has seen it twice and the
         second score is higher. Score one below, add a LICENSE or a CI workflow,
         then score it again — the gain shows up here for {windowDays} days.
       </p>

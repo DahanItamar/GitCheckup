@@ -24,7 +24,7 @@ const GRADE_HEX: Record<Grade, string> = {
   F: "#a8322f",
 };
 
-const LABEL = "repogauge";
+const LABEL = "gitcheckup";
 const LABEL_BG = "#3f3f46";
 const HEIGHT = 20;
 const CHAR_WIDTH = 6.6;
@@ -90,7 +90,7 @@ export function scoreBadge(
   });
 }
 
-/** SPEC §6: an unknown repo renders `repogauge | unknown`, never a broken image. */
+/** SPEC §6: an unknown repo renders `gitcheckup | unknown`, never a broken image. */
 export function unknownBadge(style: BadgeStyle): string {
   return renderBadge({ message: "unknown", color: "#6b7280", style });
 }

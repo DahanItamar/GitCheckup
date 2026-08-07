@@ -24,7 +24,7 @@ describe("scoreBadge", () => {
   it("shows the score and the grade", () => {
     const svg = scoreBadge(94, "A+", "flat");
     expect(svg).toContain("94 A+");
-    expect(svg).toContain("repogauge");
+    expect(svg).toContain("gitcheckup");
   });
 
   it("is well-formed SVG with explicit dimensions", () => {
@@ -59,7 +59,7 @@ describe("scoreBadge", () => {
 describe("unknownBadge", () => {
   it("renders the documented fallback text", () => {
     expect(unknownBadge("flat")).toContain("unknown");
-    expect(unknownBadge("flat")).toContain("repogauge");
+    expect(unknownBadge("flat")).toContain("gitcheckup");
   });
 });
 

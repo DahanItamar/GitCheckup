@@ -1,6 +1,6 @@
 import { clientIpFrom } from "@/lib/client-ip";
 import { RUBRIC_VERSION, SITE_URL } from "@/lib/config";
-import { HTTP_STATUS, isRepoGaugeError, userMessageFor } from "@/lib/errors";
+import { HTTP_STATUS, isGitCheckupError, userMessageFor } from "@/lib/errors";
 import { fixPlanFilename, renderFixPlan } from "@/lib/fix-plan";
 import { parseRepoSlug } from "@/lib/repo-slug";
 import { getOrComputeScore } from "@/lib/services/score-repo";
@@ -51,7 +51,7 @@ export async function GET(request: Request): Promise<Response> {
       },
     });
   } catch (error) {
-    if (isRepoGaugeError(error)) return problem(error.code, error);
+    if (isGitCheckupError(error)) return problem(error.code, error);
 
     console.error("[api/plan] unhandled failure", error);
     return problem("UPSTREAM_UNAVAILABLE");
@@ -73,6 +73,6 @@ function problem(
     headers.set("Retry-After", String(error.retryAfterSeconds));
   }
 
-  const body = `# RepoGauge\n\nNo fix plan: ${userMessageFor(code)}\n`;
+  const body = `# GitCheckup\n\nNo fix plan: ${userMessageFor(code)}\n`;
   return new Response(body, { status: HTTP_STATUS[code], headers });
 }

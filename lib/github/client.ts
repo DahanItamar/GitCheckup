@@ -30,7 +30,7 @@ const REQUEST_TIMEOUT_MS = 5_000;
  * Unset in development, `SITE_URL` falls back to localhost. Harmless — GitHub
  * only reads this when it wants to reach someone about production traffic.
  */
-const USER_AGENT = `RepoGauge (+${SITE_URL})`;
+const USER_AGENT = `GitCheckup (+${SITE_URL})`;
 
 /**
  * GETs a path under api.github.com and parses the JSON body.

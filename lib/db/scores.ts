@@ -395,7 +395,7 @@ export interface ImprovedRepo {
  *
  * The leaderboard ranked by absolute score could only ever show the same
  * handful of enormous repositories, because nothing about a 95 changes. This
- * ranks by movement, which is the one thing RepoGauge knows and GitHub does
+ * ranks by movement, which is the one thing GitCheckup knows and GitHub does
  * not — and a repo going 54 → 71 has done more work than one sitting at 95.
  *
  * Requires two scores in the window, so a repo scored once cannot appear: with

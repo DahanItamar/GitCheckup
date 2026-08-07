@@ -1,4 +1,4 @@
-# RepoGauge — Technical Spec
+# GitCheckup — Technical Spec
 
 > Status: M1–M5 built · 2026-08-07 · Spec version 1.2
 >
@@ -14,7 +14,7 @@
 
 Deciding whether an unfamiliar GitHub repo is worth adopting means opening six tabs — is there a LICENSE, is it still maintained, does CI run, is the README more than a title? Maintainers have the mirror-image problem: they don't know which of those signals they're missing until someone tells them. Both audiences currently eyeball it, inconsistently.
 
-RepoGauge turns a repo URL into a single 0–100 score with a category breakdown and a fixed list of concrete fixes, plus a share card and README badge that make the score portable.
+GitCheckup turns a repo URL into a single 0–100 score with a category breakdown and a fixed list of concrete fixes, plus a share card and README badge that make the score portable.
 
 **Primary user:** a developer evaluating or maintaining a public repo, who wants a defensible one-number answer in under three seconds.
 **Success looks like:** paste `facebook/react`, get a score and a breakdown in <3s cold / <500ms cached, and be able to copy a Markdown snippet that renders a card in your own README.
@@ -136,7 +136,7 @@ Because: one runtime means one set of capabilities to reason about. `ImageRespon
 ### Directory layout
 
 ```
-RepoGauge/
+GitCheckup/
 ├── app/
 │   ├── layout.tsx                   # Root shell, fonts, theme. No data fetching.
 │   ├── page.tsx                     # Landing: URL input, example repos, recent scores strip.
@@ -165,7 +165,7 @@ RepoGauge/
 │
 ├── lib/
 │   ├── config.ts                    # Zod-parsed env. Throws at import time if invalid.
-│   ├── errors.ts                    # [M1] RepoGaugeError + code→status/copy. Imports nothing.
+│   ├── errors.ts                    # [M1] GitCheckupError + code→status/copy. Imports nothing.
 │   ├── github/
 │   │   ├── client.ts                # The ONLY fetch() to api.github.com in the repo.
 │   │   ├── signals.ts               # The 6-call fan-out → RepoSignals.
@@ -208,7 +208,7 @@ RepoGauge/
 
 **[M1] Two files this layout didn't anticipate.**
 
-`lib/errors.ts` exists because `RepoGaugeError`'s codes and copy are needed by
+`lib/errors.ts` exists because `GitCheckupError`'s codes and copy are needed by
 client components (`error.tsx` is `'use client'`), and importing them from
 `lib/services/` would pull the database client into the browser bundle. It
 imports nothing, which is what makes it safe to import from anywhere.
@@ -495,7 +495,7 @@ Six calls, issued in parallel via `Promise.allSettled`, 5-second timeout each vi
 
 **[M5] A rejected token is not an outage.** `401` maps to its own `UNAUTHORIZED` code rather than to `UNAVAILABLE`, and `lib/github/client.ts` logs it by name at the point of detection. The visitor still sees the `UPSTREAM_UNAVAILABLE` copy — they cannot act on an expired PAT — but the operator gets a line that says which of the two it is. It is logged in the client rather than where it is finally handled because with a warm cache the service degrades to stale scores and never reaches the error mapping: the site keeps answering, looks healthy, and serves frozen data indefinitely. This is the failure mode a token expiry produces, and it is the one worth being loud about.
 
-Only call #1 is fatal. Any other rejection degrades that signal to its "absent" value and the score still returns — a partial score beats an error page. Every request sends `Authorization: Bearer ${GITHUB_TOKEN}`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, and a `User-Agent` identifying RepoGauge.
+Only call #1 is fatal. Any other rejection degrades that signal to its "absent" value and the score still returns — a partial score beats an error page. Every request sends `Authorization: Bearer ${GITHUB_TOKEN}`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, and a `User-Agent` identifying GitCheckup.
 
 ### HTTP API — inbound
 
@@ -503,8 +503,8 @@ Only call #1 is fatal. Any other rejection degrades that signal to its "absent" 
 | ------------------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/score?repo={owner}/{name}` | Full score as JSON                              | `?repo=facebook/react` → `{ repo: {owner,name,stars}, score: ScoreResult, fetchedAt: string, cached: boolean }` | `400 INVALID_SLUG` · `404 REPO_NOT_FOUND` · `429 RATE_LIMITED` (+`Retry-After`) · `502 UPSTREAM_UNAVAILABLE`                       |
 | `GET /api/og?repo={owner}/{name}`    | 1200×630 PNG share card                         | → `image/png`                                                                                                   | On any error, returns a **200 with a fallback card** reading "Couldn't score this repo" — never a broken image in someone's README |
-| `GET /api/badge?repo={owner}/{name}` | Shields-style SVG badge                         | `&style=flat\|flat-square` → `image/svg+xml`                                                                    | Same fallback rule: renders `RepoGauge \| unknown` at 200                                                                          |
-| `GET /api/plan?repo={owner}/{name}`  | **[M5]** The fix list as a Markdown download    | → `text/markdown` + `Content-Disposition: attachment; filename="repogauge-{owner}-{name}.md"`                   | Markdown on failure too, at the same statuses as `/api/score` — a browser following a download link must not save a JSON blob      |
+| `GET /api/badge?repo={owner}/{name}` | Shields-style SVG badge                         | `&style=flat\|flat-square` → `image/svg+xml`                                                                    | Same fallback rule: renders `GitCheckup \| unknown` at 200                                                                         |
+| `GET /api/plan?repo={owner}/{name}`  | **[M5]** The fix list as a Markdown download    | → `text/markdown` + `Content-Disposition: attachment; filename="gitcheckup-{owner}-{name}.md"`                  | Markdown on failure too, at the same statuses as `/api/score` — a browser following a download link must not save a JSON blob      |
 | `GET /`                              | Landing: input, examples, recent-scores strip   | HTML                                                                                                            | —                                                                                                                                  |
 | `GET /r/{owner}/{repo}`              | Result page, server-rendered with OG meta       | HTML                                                                                                            | Typed error → `error.tsx` copy                                                                                                     |
 | `GET /trending`                      | Leaderboard, top 20 by score in the last 7 days | HTML                                                                                                            | —                                                                                                                                  |
@@ -536,7 +536,7 @@ export async function getOrComputeScore(
 ): Promise<ScoredRepo>;
 ```
 
-Throws `RepoGaugeError` with `code: 'INVALID_SLUG' | 'REPO_NOT_FOUND' | 'RATE_LIMITED' | 'UPSTREAM_UNAVAILABLE'`. Route handlers map codes to status codes in one place; nothing else catches.
+Throws `GitCheckupError` with `code: 'INVALID_SLUG' | 'REPO_NOT_FOUND' | 'RATE_LIMITED' | 'UPSTREAM_UNAVAILABLE'`. Route handlers map codes to status codes in one place; nothing else catches.
 
 ### Tip provider seam (`lib/tips/types.ts`)
 
@@ -582,9 +582,9 @@ Both are properties of the tip provider, not the rubric — the points are still
 6. On a cold path: `lib/github/signals.ts` issues the six parallel calls, `lib/score/rubric.ts` scores the result, `lib/tips/` generates tips, and `lib/db/scores.ts` upserts `repos` and inserts a `scores` row.
 7. The page renders the dial, the sparkline beneath it, the five-category breakdown, the tips, and the embed snippets. `generateMetadata` sets `og:image` to `{SITE_URL}/api/og?repo={owner}/{name}`.
 
-**Failure branches:** repo doesn't exist or is private → `error.tsx` shows "We couldn't find that repo. RepoGauge only reads public repositories." · rate limited → "Too many new repos scored from your network. Try again in a few minutes." with the `Retry-After` value · GitHub down → if any score exists in the DB regardless of age, serve it with a "scored {n} days ago" notice rather than failing.
+**Failure branches:** repo doesn't exist or is private → `error.tsx` shows "We couldn't find that repo. GitCheckup only reads public repositories." · rate limited → "Too many new repos scored from your network. Try again in a few minutes." with the `Retry-After` value · GitHub down → if any score exists in the DB regardless of age, serve it with a "scored {n} days ago" notice rather than failing.
 
-**[M1] Expected failures render from `page.tsx`, not from `error.tsx`.** Next replaces a server-thrown error's `message` with a generic string plus a digest in production, so copy that reaches the user through a thrown error would be lost exactly where it matters. The page catches `RepoGaugeError`, maps the `code` to copy via `components/RepoError.tsx`, and returns it as normal output. `error.tsx` stays mounted as the boundary for genuinely unexpected throws, and renders the same component with a reset button.
+**[M1] Expected failures render from `page.tsx`, not from `error.tsx`.** Next replaces a server-thrown error's `message` with a generic string plus a digest in production, so copy that reaches the user through a thrown error would be lost exactly where it matters. The page catches `GitCheckupError`, maps the `code` to copy via `components/RepoError.tsx`, and returns it as normal output. `error.tsx` stays mounted as the boundary for genuinely unexpected throws, and renders the same component with a reset button.
 
 ### Flow B — Share card renders on social or in a README
 
@@ -603,9 +603,9 @@ Both are properties of the tip provider, not the rubric — the points are still
 ### Flow C — Take the result away (embed, or fix plan)
 
 1. On `/r/{owner}/{repo}`, `EmbedSnippets` shows two prefilled snippets built from `NEXT_PUBLIC_SITE_URL`:
-   - Card: `[![RepoGauge](https://site/api/og?repo=owner/name)](https://site/r/owner/name)`
-   - Badge: `[![RepoGauge](https://site/api/badge?repo=owner/name)](https://site/r/owner/name)`
-2. "Copy Markdown" writes to the clipboard; "Download PNG" fetches `/api/og` and triggers a download with filename `RepoGauge-{owner}-{name}.png`.
+   - Card: `[![GitCheckup](https://site/api/og?repo=owner/name)](https://site/r/owner/name)`
+   - Badge: `[![GitCheckup](https://site/api/badge?repo=owner/name)](https://site/r/owner/name)`
+2. "Copy Markdown" writes to the clipboard; "Download PNG" fetches `/api/og` and triggers a download with filename `GitCheckup-{owner}-{name}.png`.
 
 Both snippets wrap the image in a link back to the result page — that link is the acquisition loop and it is not optional.
 
@@ -645,7 +645,7 @@ The 50-star floor is deliberate: without it, the leaderboard is whatever anyone 
 3. Declines and flat lines are excluded — the page reports improvement, not change.
 4. Bounded and ordered by `first_seen_at`, so a repo that merely got _looked at_ today cannot claim a months-old improvement was recent.
 
-**Why the rename.** Ranking by absolute score meant the board could only ever list the same enormous repositories: nothing about a 95 changes, and the repos most likely to move are the small ones with room to climb. That is a popularity contest wearing the word "trending". Movement is the one thing RepoGauge knows that GitHub does not, and "Most improved" sets the expectation the data can actually meet. `/trending` 308s to `/improved`, permanently — the old path is in the metadata of anything already shared.
+**Why the rename.** Ranking by absolute score meant the board could only ever list the same enormous repositories: nothing about a 95 changes, and the repos most likely to move are the small ones with room to climb. That is a popularity contest wearing the word "trending". Movement is the one thing GitCheckup knows that GitHub does not, and "Most improved" sets the expectation the data can actually meet. `/trending` 308s to `/improved`, permanently — the old path is in the metadata of anything already shared.
 
 **Why the star floor drops to 10 rather than to zero.** §9 relies on the floor as the mitigation for a public surface anyone can push a repository onto, and it works by making an entry cost real stars. Keeping 50 here would rebuild the hall of giants this page exists to escape. 10 keeps a throwaway repository off the homepage while letting a genuinely small project on; it is the first number to raise if spam appears, and the 30-day window means anything unwanted ages off without intervention.
 
@@ -704,7 +704,7 @@ is the one thing that makes the breakdown checkable by eye.
 
 ### [M5] The dogfooding target in M5 is unreachable for a new repository
 
-Scoring itself with every M5 file in place, RepoGauge reaches **83 (A)**, not
+Scoring itself with every M5 file in place, GitCheckup reaches **83 (A)**, not
 the ≥90 the milestone asks for. The gap is entirely `popularity`: 15 points of
 stars and forks that no amount of work on the repository can produce on day
 one. Reaching 90 needs roughly a thousand stars.
@@ -850,7 +850,7 @@ unauthenticated verification traffic exhausted GitHub's 60/hr anonymous quota
 mid-session, which exercised the whole chain against the real API rather than
 a mock: a `403` carrying `x-ratelimit-remaining: 0` was detected as
 `RATE_LIMITED`, translated to `UPSTREAM_UNAVAILABLE` rather than blamed on the
-caller, and rendered as `repogauge | unknown` at **status 200** — not a broken
+caller, and rendered as `gitcheckup | unknown` at **status 200** — not a broken
 image. Confirmed in the logs, end to end.
 
 **[M4] Two things the spec did not anticipate.**
@@ -877,13 +877,13 @@ logged.
 **M5 — The README is the product page**
 End state: the repo alone sells it.
 
-- [~] `README.md`: one-liner, demo GIF of the paste→score flow, both embed snippets, self-scored RepoGauge badge — **written; the GIF and the self-scored badge need a deployment and a public repo**
+- [~] `README.md`: one-liner, demo GIF of the paste→score flow, both embed snippets, self-scored GitCheckup badge — **written; the GIF and the self-scored badge need a deployment and a public repo**
 - [x] `CLAUDE.md` pointing at this spec
 - [x] GitHub Actions CI: format, lint, typecheck, test, `madge --circular`
 - [x] LICENSE, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, issue and PR templates, `.github/workflows`
-- [ ] Dogfood: RepoGauge should score itself ≥90 — **blocked, and unreachable as specified; see §8**
+- [ ] Dogfood: GitCheckup should score itself ≥90 — **blocked, and unreachable as specified; see §8**
 
-**[M5] The repository is private, so RepoGauge cannot score itself at all.**
+**[M5] The repository is private, so GitCheckup cannot score itself at all.**
 The product reads public repositories only — that is the whole zero-permission
 posture from §2 — so dogfooding requires making this repo public first. That is
 a deliberate decision, not a formality, and it also gates the Camo verification
@@ -902,11 +902,11 @@ something the type checker already proved.
 
 Numbered so any one can be rejected without reopening the rest.
 
-1. **[M1] The GitHub name is `DahanItamar/RepoGauge`; the package name is `RepoGauge`. One working copy still sits at the lowercase `C:\Users\USER\Documents\repogauge`.** Revised from the original all-lowercase assumption: the product is called RepoGauge, and the identifiers now match it rather than splitting brand from slug. Three notes, each of which has bitten once:
+1. **[M5] The product is GitCheckup, at `gitcheckup.com`; the package name is `gitcheckup`, all lowercase.** Renamed from RepoGauge before launch — while nothing was published and no badge sat in anyone's README, which was the last moment it was cheap. Three notes:
 
-   - **npm.** `package.json` carries `"name": "RepoGauge"`, which is legal _only_ because the package is `private: true`. **If this is ever published, that field must go back to lowercase** — npm rejects capitals outright. Verified, not assumed.
-   - **The local directory is deliberately not renamed.** A case-only rename on Windows needs every handle on the folder released, and an open editor or shell holds one. It buys nothing: NTFS is case-insensitive, so both spellings resolve to the same directory and no reference breaks. A fresh `git clone` produces `RepoGauge/`, which is what the §4 tree shows.
-   - **The old GitHub slug still resolves.** GitHub permanently redirects `repogauge` → `RepoGauge`, so anything already linking to the old URL keeps working.
+   - **npm.** `package.json` carries `"name": "gitcheckup"`. The previous name was TitleCase, legal _only_ because the package is `private: true`; lowercase removes that footgun whether or not it is ever published.
+   - **The local working copy still sits in a directory called `repogauge`.** Renaming it buys nothing — no code reads the directory name — and on Windows it needs every handle on the folder released first.
+   - **The old GitHub slug keeps working.** GitHub permanently redirects a renamed repository, which is the same mechanism `repo_aliases` exists to absorb for _scored_ repositories (§5).
 
 2. **A single server-side PAT serves all users; there is no per-user token entry.** Rejecting this adds an optional "paste your own token" field and a whole trust conversation about handling someone else's credential — a meaningfully different product.
 3. **6-hour score TTL, 7-day stale ceiling, 6-hour CDN cache on images, 180-day score history.** Pure tuning constants in `lib/config.ts`; change freely.

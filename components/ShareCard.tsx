@@ -58,7 +58,7 @@ function truncate(value: string, max: number): string {
 }
 
 /**
- * `https://repogauge.app` → `repogauge.app`. The scheme is noise on a card
+ * `https://gitcheckup.app` → `gitcheckup.app`. The scheme is noise on a card
  * nobody can click, and on localhost the port has to survive or the label
  * names a host that is not the one that rendered it.
  */
@@ -159,7 +159,7 @@ export function ShareCard({
 
       <div style={footer}>
         <div style={{ display: "flex", color: FAINT }}>
-          repo<span style={{ color: accent }}>gauge</span>
+          git<span style={{ color: accent }}>checkup</span>
           <span style={{ paddingLeft: 10 }}>{siteLabel(siteUrl)}</span>
         </div>
         <div style={{ display: "flex", color: FAINT }}>
@@ -194,7 +194,7 @@ export function FallbackShareCard({
         {truncate(label, 48)}
       </div>
       <div style={{ display: "flex", fontSize: 24, color: FAINT }}>
-        repo<span style={{ color: "#5fbf8b" }}>gauge</span>
+        git<span style={{ color: "#5fbf8b" }}>checkup</span>
         <span style={{ paddingLeft: 8 }}>{siteLabel(siteUrl)}</span>
       </div>
     </div>

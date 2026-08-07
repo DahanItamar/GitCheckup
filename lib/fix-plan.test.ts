@@ -54,17 +54,17 @@ const INPUT: FixPlanInput = {
   score: SCORE,
   fetchedAt: "2026-08-07T12:00:00.000Z",
   rubricVersion: 2,
-  resultUrl: "https://repogauge.app/r/acme/starter-kit",
+  resultUrl: "https://gitcheckup.app/r/acme/starter-kit",
 };
 
 describe("renderFixPlan", () => {
   const plan = renderFixPlan(INPUT);
 
   it("leads with the repo, the score and where it came from", () => {
-    expect(plan).toContain("# RepoGauge fix plan — acme/starter-kit");
+    expect(plan).toContain("# GitCheckup fix plan — acme/starter-kit");
     expect(plan).toContain("**6/100 · grade F**");
     expect(plan).toContain("rubric v2");
-    expect(plan).toContain("https://repogauge.app/r/acme/starter-kit");
+    expect(plan).toContain("https://gitcheckup.app/r/acme/starter-kit");
   });
 
   it("counts only the reachable points toward the target", () => {
@@ -178,7 +178,7 @@ describe("uncapped, unlike the page", () => {
 describe("fixPlanFilename", () => {
   it("names the repo it describes", () => {
     expect(fixPlanFilename("acme", "starter-kit")).toBe(
-      "repogauge-acme-starter-kit.md",
+      "gitcheckup-acme-starter-kit.md",
     );
   });
 });

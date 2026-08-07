@@ -11,7 +11,7 @@ import { findMostImproved, type ImprovedRepo } from "@/lib/db/scores";
  *
  * Replaces ranking by absolute score, which could only ever list the same
  * enormous repositories — nothing about a 95 changes. This asks who did the
- * work, which is the question RepoGauge is uniquely able to answer.
+ * work, which is the question GitCheckup is uniquely able to answer.
  */
 
 export interface ImprovedView {
