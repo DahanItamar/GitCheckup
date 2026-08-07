@@ -1,9 +1,9 @@
 # Handoff — 2026-08-07
 
-Where RepoGauge stands, what is proven, and what to do next. Written against
-the working tree after the M5 follow-up session (demo mode, the UI pass, and
-the fix plan); the last commit is `07e5efa` and none of that work is committed
-yet. 249 tests, all gates green.
+Where RepoGauge stands, what is proven, and what to do next. Written at commit
+`0fa8233` on `main`, after the M5 follow-up session: demo mode, the fix plan,
+the interface pass, and a test for the GitHub client. 265 tests, all gates
+green, nothing pushed — the repository is still private.
 
 ---
 
@@ -68,7 +68,8 @@ single check exercises the whole Flow A cache path end to end.
 
 ## What changed after the M5 commit
 
-None of this is committed. It is all in the working tree, gates green.
+Two commits on top of `07e5efa`: `2831f9a` for the first four rows, `0fa8233`
+for the GitHub client tests.
 
 | Area               | What                                                                                                                                                                              |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
