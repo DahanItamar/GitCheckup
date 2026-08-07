@@ -20,6 +20,16 @@
   --grade-c: #8d6a15;
   --grade-d: #a1571b;
   --grade-f: #a63232;
+
+  /*
+   * Two elevations, no more. Cards sit at rest; only what the pointer is on
+   * lifts. A third step would make "slightly raised" a judgement call every
+   * time a component is written.
+   */
+  --elevation-rest:
+    0 1px 2px oklch(0% 0 0 / 0.04), 0 1px 3px oklch(0% 0 0 / 0.04);
+  --elevation-lift:
+    0 2px 4px oklch(0% 0 0 / 0.05), 0 8px 20px oklch(0% 0 0 / 0.07);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,6 +49,12 @@
     --grade-c: #d6ac52;
     --grade-d: #e28c4f;
     --grade-f: #e26760;
+
+    /* Shadow reads as dirt on a dark ground, so depth comes from light. */
+    --elevation-rest:
+      0 1px 2px oklch(0% 0 0 / 0.4), inset 0 1px 0 oklch(100% 0 0 / 0.03);
+    --elevation-lift:
+      0 8px 24px oklch(0% 0 0 / 0.5), inset 0 1px 0 oklch(100% 0 0 / 0.06);
   }
 }
 
@@ -53,6 +69,9 @@
   --color-accent: var(--accent);
   --color-track: var(--track);
 
+  --shadow-rest: var(--elevation-rest);
+  --shadow-lift: var(--elevation-lift);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -66,6 +85,73 @@ body {
 ::selection {
   background-color: var(--accent);
   color: var(--canvas);
+}
+
+/*
+ * One focus ring for the whole app. Tailwind v4 ships no default cursor on
+ * buttons and no focus style worth keeping, so both are set once here rather
+ * than re-declared on every interactive element.
+ */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+a[href],
+summary {
+  cursor: pointer;
+}
+
+/* --- Motion ---------------------------------------------------------------
+ * Every animation below states a fact that is already on screen: the dial
+ * draws to the score, a bar grows to its ratio, content arrives in reading
+ * order. Nothing loops, and the reduced-motion block at the bottom of this
+ * file flattens all of it.
+ */
+
+@keyframes dial-draw {
+  from {
+    stroke-dashoffset: var(--dial-circumference);
+  }
+  to {
+    stroke-dashoffset: var(--dial-offset);
+  }
+}
+
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-dial-draw {
+  animation: dial-draw 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-bar-grow {
+  transform-origin: left center;
+  animation: bar-grow 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-rise {
+  animation: rise 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

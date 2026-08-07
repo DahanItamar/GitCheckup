@@ -3,8 +3,11 @@ import { headers } from "next/headers";
 
 import { CategoryBreakdown } from "@/components/CategoryBreakdown";
 import { EmbedSnippets } from "@/components/EmbedSnippets";
+import { gradeTint } from "@/components/grade-color";
+import { StarIcon } from "@/components/icons";
 import { RepoError } from "@/components/RepoError";
 import { RepoInput } from "@/components/RepoInput";
+import { RetryButton } from "@/components/RetryButton";
 import { ScoreDial } from "@/components/ScoreDial";
 import { TipList } from "@/components/TipList";
 import { clientIpFrom } from "@/lib/client-ip";
@@ -73,10 +76,17 @@ export default async function ResultPage({ params }: RouteParams) {
     });
   } catch (error) {
     if (isRepoGaugeError(error)) {
+      // A rate limit refills and an upstream outage ends, so both get a way to
+      // try this repo again. A missing repo does not — offering a retry there
+      // would invite someone to hammer a slug that will never resolve.
+      const recoverable =
+        error.code === "RATE_LIMITED" || error.code === "UPSTREAM_UNAVAILABLE";
+
       return (
         <RepoError
           code={error.code}
           retryAfterSeconds={error.retryAfterSeconds}
+          action={recoverable ? <RetryButton /> : undefined}
         />
       );
     }
@@ -92,7 +102,10 @@ function Result({ result }: { result: ScoredRepo }) {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-14">
-      <header className="flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between">
+      <header
+        className="animate-rise flex flex-col gap-8 rounded-2xl border border-border p-8 shadow-rest sm:flex-row sm:items-center sm:justify-between sm:p-10"
+        style={{ backgroundColor: gradeTint(score.grade, 5) }}
+      >
         <div className="min-w-0">
           <a
             href={githubUrl}
@@ -101,7 +114,8 @@ function Result({ result }: { result: ScoredRepo }) {
           >
             {repo.owner}/{repo.name}
           </a>
-          <p className="mt-2 text-sm text-muted tabular-nums">
+          <p className="mt-2 flex items-center gap-1.5 text-sm tabular-nums text-muted">
+            <StarIcon className="size-3.5 text-faint" />
             {formatCount(repo.stars)} stars · scored{" "}
             <time dateTime={result.fetchedAt}>
               {formatScoredAt(result.fetchedAt)}
@@ -116,7 +130,7 @@ function Result({ result }: { result: ScoredRepo }) {
 
       <div className="mt-14 space-y-14">
         <CategoryBreakdown categories={score.categories} />
-        <TipList tips={score.tips} />
+        <TipList tips={score.tips} owner={repo.owner} name={repo.name} />
         <EmbedSnippets owner={repo.owner} name={repo.name} siteUrl={SITE_URL} />
 
         <section className="border-t border-border pt-10">

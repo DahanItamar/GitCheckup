@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+
+import { DownloadLabel, downloadActionClass } from "./DownloadAction";
+import { Spinner } from "./icons";
 
 /**
  * Flow C (SPEC §7). Both snippets wrap the image in a link back to the result
@@ -51,68 +54,148 @@ export function EmbedSnippets({ owner, name, siteUrl }: EmbedSnippetsProps) {
   );
 }
 
+/**
+ * `idle` → `copied` on success. `manual` is the denied-clipboard path: the
+ * write can fail on an insecure origin or a withheld permission, and the old
+ * behaviour was to reset the label to "Copy" — the same button, the same
+ * text, no indication anything had happened. The user clicks again.
+ */
+type CopyState = "idle" | "copied" | "manual";
+
 function SnippetRow({ label, markdown }: { label: string; markdown: string }) {
-  const [copied, setCopied] = useState(false);
+  const [state, setState] = useState<CopyState>("idle");
+  const code = useRef<HTMLElement>(null);
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(markdown);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setState("copied");
+      setTimeout(() => setState("idle"), 2000);
     } catch {
-      // Clipboard access can be denied; the text is selectable either way.
-      setCopied(false);
+      // Select the text so the manual instruction is one keystroke, not a
+      // drag across a truncated element that does not look selectable.
+      selectContents(code.current);
+      setState("manual");
     }
   }
 
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2">
       <span className="w-12 shrink-0 text-xs text-faint">{label}</span>
-      <code className="min-w-0 flex-1 truncate font-mono text-xs text-muted">
+      <code
+        ref={code}
+        className="min-w-0 flex-1 truncate font-mono text-xs text-muted"
+      >
         {markdown}
       </code>
       <button
         type="button"
         onClick={() => void copy()}
-        className="shrink-0 rounded-md border border-border-strong px-2.5 py-1 text-xs transition-colors duration-150 hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="shrink-0 rounded-md border border-border-strong px-2.5 py-1 text-xs whitespace-nowrap transition-colors duration-150 hover:border-accent"
+        style={state === "copied" ? { color: "var(--accent)" } : undefined}
       >
-        {copied ? "Copied" : "Copy"}
+        <span aria-live="polite">
+          {state === "copied"
+            ? "Copied"
+            : state === "manual"
+              ? `Selected — press ${copyKeyLabel()}`
+              : "Copy"}
+        </span>
       </button>
     </div>
   );
 }
 
+/** Read at click time, never during render — it would not match the server. */
+function copyKeyLabel(): string {
+  return navigator.userAgent.includes("Mac") ? "⌘C" : "Ctrl+C";
+}
+
+function selectContents(element: HTMLElement | null) {
+  const selection = window.getSelection();
+  if (element === null || selection === null) return;
+
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
 function DownloadPng({ owner, name, siteUrl }: EmbedSnippetsProps) {
-  const [busy, setBusy] = useState(false);
+  const [state, setState] = useState<"idle" | "busy" | "failed">("idle");
+  const cardUrl = `${siteUrl}/api/og?repo=${owner}/${name}`;
 
   async function download() {
-    setBusy(true);
+    setState("busy");
     try {
-      const response = await fetch(`${siteUrl}/api/og?repo=${owner}/${name}`);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const response = await fetch(cardUrl);
 
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `RepoGauge-${owner}-${name}.png`;
-      link.click();
+      // Without this an error response still resolves to a blob, and the
+      // browser saves an HTML error page under a .png name — a failure that
+      // looks exactly like a success until someone opens the file.
+      if (!response.ok) throw new Error(`card responded ${response.status}`);
 
-      URL.revokeObjectURL(url);
+      saveBlob(await response.blob(), `RepoGauge-${owner}-${name}.png`);
+      setState("idle");
     } catch {
-      // Nothing actionable to say; the card is one click away at /api/og.
-    } finally {
-      setBusy(false);
+      setState("failed");
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => void download()}
-      disabled={busy}
-      className="mt-3 text-sm text-muted underline decoration-border-strong underline-offset-4 transition-colors duration-150 hover:text-ink disabled:opacity-60"
-    >
-      {busy ? "Preparing…" : "Download PNG"}
-    </button>
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={() => void download()}
+        disabled={state === "busy"}
+        className={downloadActionClass}
+      >
+        {state === "busy" ? (
+          <>
+            <Spinner className="text-faint" />
+            Preparing…
+          </>
+        ) : (
+          <DownloadLabel format="PNG">Download card</DownloadLabel>
+        )}
+      </button>
+
+      {/* Beside the control that failed, with the route that still works —
+          the card renders fine in a tab even when the fetch does not. */}
+      {state === "failed" && (
+        <p role="alert" className="mt-2 text-sm text-muted">
+          <span style={{ color: "var(--grade-f)" }}>
+            Couldn&apos;t prepare the file.
+          </span>{" "}
+          <a
+            href={cardUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline decoration-border-strong underline-offset-4 hover:text-ink"
+          >
+            Open the card directly
+          </a>{" "}
+          and save it from there.
+        </p>
+      )}
+    </div>
   );
+}
+
+/**
+ * The revoke is deferred by a tick on purpose: revoking in the same task as
+ * `click()` races the browser's own read of the URL, and losing that race is
+ * another download that silently never happens.
+ */
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }

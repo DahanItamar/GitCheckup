@@ -14,6 +14,20 @@ in an issue rather than working around it.
 
 ## Getting set up
 
+If your change is to the interface and not to what it fetches, you need no
+credentials at all:
+
+```bash
+pnpm install
+echo "DEMO_MODE=1" > .env
+pnpm dev
+```
+
+Demo mode scores bundled fixtures with the real rubric and makes no outbound
+call (spec §11 assumption 12). Every page says so in a banner.
+
+For anything touching GitHub, the cache, or the rate limiter:
+
 ```bash
 pnpm install
 cp .env.example .env      # fill in GITHUB_TOKEN, DATABASE_URL, RATE_LIMIT_SECRET
@@ -22,8 +36,8 @@ pnpm dev
 ```
 
 `GITHUB_TOKEN` must be a fine-grained PAT with **public repository read access
-and zero write scopes**. The app deliberately refuses to boot without a full
-environment rather than degrading silently.
+and zero write scopes**. Outside demo mode the app deliberately refuses to boot
+without a full environment rather than degrading silently.
 
 ## Before you open a pull request
 

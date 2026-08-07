@@ -148,15 +148,19 @@ RepoGauge/
 │   └── api/
 │       ├── score/route.ts           # GET, JSON.
 │       ├── og/route.tsx             # GET, image/png. .tsx because ImageResponse takes JSX.
-│       └── badge/route.ts           # GET, image/svg+xml.
+│       ├── badge/route.ts           # GET, image/svg+xml.
+│       └── plan/route.ts            # [M5] GET, text/markdown. The downloadable fix plan.
 │
 ├── components/                      # Presentational only. No fetching, no lib/db import.
 │   ├── ScoreDial.tsx
 │   ├── CategoryBreakdown.tsx
 │   ├── TipList.tsx
+│   ├── TrendingList.tsx
+│   ├── ShareCard.tsx                # Satori, not a browser: literal hex, flexbox only.
 │   ├── RepoInput.tsx                # 'use client' — the only client component with state.
 │   ├── RepoError.tsx                # [M1] Typed error code → heading + copy.
-│   ├── grade-color.ts               # [M1] Grade → CSS custom property.
+│   ├── grade-color.ts               # [M1] Grade → CSS custom property. [M5] + tint helpers.
+│   ├── icons.tsx                    # [M5] Hand-written SVG. Same reasoning as the badge.
 │   └── EmbedSnippets.tsx            # 'use client' — clipboard access.
 │
 ├── lib/
@@ -183,7 +187,14 @@ RepoGauge/
 │   │   ├── scores.ts                # Score read/write queries.
 │   │   └── rate-limit.ts            # Rate-limit counter queries.
 │   ├── services/
-│   │   └── score-repo.ts            # getOrComputeScore(). The one orchestration seam.
+│   │   ├── score-repo.ts            # getOrComputeScore(). The one orchestration seam.
+│   │   ├── freshness.ts             # Pure fresh/stale/cold decision.
+│   │   ├── rate-limit.ts            # Per-IP cold-score budget.
+│   │   └── trending.ts              # Flow D, plus the demo-mode leaderboard.
+│   ├── demo/
+│   │   └── repos.ts                 # [M5] Fixtures for DEMO_MODE. See §11 assumption 12.
+│   ├── badge.ts                     # Score → SVG. Pure.
+│   ├── fix-plan.ts                  # [M5] Score → Markdown brief. Pure, same reason as badge.
 │   ├── repo-slug.ts                 # Parse + validate owner/repo from any input form. Pure.
 │   └── repo-slug.test.ts            # [M1] Colocated.
 │
@@ -204,6 +215,24 @@ imports nothing, which is what makes it safe to import from anywhere.
 
 `components/RepoError.tsx` exists because §7's failure copy has to render from
 the **page**, not only from `error.tsx` — see the note in §7.
+
+**[M5] Pure renderers are a category, not a coincidence.** `lib/badge.ts` and
+`lib/fix-plan.ts` both take a finished score and return bytes — SVG and
+Markdown. Neither does IO, both are fully tested without a network, and both
+keep their route to a dozen lines of parse-call-respond. Anything that turns a
+`ScoreResult` into another representation belongs here rather than inside a
+route handler. `components/ShareCard.tsx` is the same idea one level up: it is
+a renderer, but its output is JSX for Satori, so it lives with the components.
+
+**[M5] One tint strength, and it is not a parameter.** `gradeChip()` in
+`components/grade-color.ts` returns the strongest grade-coloured background
+that still clears WCAG AA (4.5:1) for grade-coloured text on it, in **both**
+schemes. Two cases bind it from opposite directions: in light mode amber falls
+below 4.5 past 8%, and in dark mode red falls below it past 6%, because mixing
+a bright colour into a near-black canvas lifts the background fast. 6% clears
+both. The number is baked into the function rather than passed in, because a
+caller choosing its own would silently fail one scheme. `gradeTint(grade, n)`
+remains available for washes that carry no text.
 
 ### Dependency direction
 
@@ -469,11 +498,12 @@ Only call #1 is fatal. Any other rejection degrades that signal to its "absent" 
 | `GET /api/score?repo={owner}/{name}` | Full score as JSON                              | `?repo=facebook/react` → `{ repo: {owner,name,stars}, score: ScoreResult, fetchedAt: string, cached: boolean }` | `400 INVALID_SLUG` · `404 REPO_NOT_FOUND` · `429 RATE_LIMITED` (+`Retry-After`) · `502 UPSTREAM_UNAVAILABLE`                       |
 | `GET /api/og?repo={owner}/{name}`    | 1200×630 PNG share card                         | → `image/png`                                                                                                   | On any error, returns a **200 with a fallback card** reading "Couldn't score this repo" — never a broken image in someone's README |
 | `GET /api/badge?repo={owner}/{name}` | Shields-style SVG badge                         | `&style=flat\|flat-square` → `image/svg+xml`                                                                    | Same fallback rule: renders `RepoGauge \| unknown` at 200                                                                          |
+| `GET /api/plan?repo={owner}/{name}`  | **[M5]** The fix list as a Markdown download    | → `text/markdown` + `Content-Disposition: attachment; filename="repogauge-{owner}-{name}.md"`                   | Markdown on failure too, at the same statuses as `/api/score` — a browser following a download link must not save a JSON blob      |
 | `GET /`                              | Landing: input, examples, recent-scores strip   | HTML                                                                                                            | —                                                                                                                                  |
 | `GET /r/{owner}/{repo}`              | Result page, server-rendered with OG meta       | HTML                                                                                                            | Typed error → `error.tsx` copy                                                                                                     |
 | `GET /trending`                      | Leaderboard, top 20 by score in the last 7 days | HTML                                                                                                            | —                                                                                                                                  |
 
-Response headers on `/api/score`: `Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400`.
+Response headers on `/api/score` and `/api/plan`: `Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400`.
 Response headers on `/api/og` and `/api/badge`: `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800` — long, because GitHub's Camo proxy is the primary caller and re-rendering per README view is the one thing that could exhaust the token budget.
 
 Error body shape is uniform: `{ error: { code: string, message: string } }`. `message` is safe to display; no upstream detail, no stack.
@@ -555,12 +585,16 @@ Both are properties of the tip provider, not the rubric — the points are still
 1. Twitter/Slack/GitHub Camo requests `/api/og?repo=owner/name`.
 2. Vercel's CDN serves a cached PNG if one exists (`s-maxage=21600`). Most requests stop here and never reach our code.
 3. On a miss, the route calls `getOrComputeScore` — **with `forceRefresh` unavailable**. If a score exists at any age, it is used as-is; the OG route never triggers a GitHub fetch for a stale score, only for a completely unknown repo.
-4. `ImageResponse` renders the card at 1200×630: repo name, big score, grade, five category bars, top three tips, wordmark.
+4. `ImageResponse` renders the card at 1200×630: repo name, big score, grade, five category bars, wordmark and site host.
 5. On any failure, a fallback card is returned at status 200.
+
+**[M5] The card states the result and carries no tips.** It originally rendered the top three. The card's job is to be embedded in the scored repository's own README, and a list of that repository's shortcomings is the last thing its author wants published — the tips were driving people away from the one surface that recruits new users. The fix list moved to `/api/plan`, which is downloaded rather than embedded, and the space it freed went to the category bars. See Flow C.
+
+**[M5] Each category bar is coloured by its own ratio**, on the same five bands as the grades, rather than all five taking the repo's overall grade colour. Painting them uniformly made 0/25 and 25/25 identical at a glance, which is the whole of what a reader takes from a card seen in passing. `components/ShareCard.tsx` mirrors `components/grade-color.ts` in literal hex, because Satori resolves no custom properties.
 
 **Why step 3 is written that way:** this endpoint is called by GitHub's proxy on every README view of every repo that embeds the badge. If it could trigger GitHub fetches, long-tail README traffic would drain the 5000/hr token budget with no user waiting on the result. Freshness is a UI concern; the card trades it for a hard ceiling on outbound calls.
 
-### Flow C — Copy the README embed
+### Flow C — Take the result away (embed, or fix plan)
 
 1. On `/r/{owner}/{repo}`, `EmbedSnippets` shows two prefilled snippets built from `NEXT_PUBLIC_SITE_URL`:
    - Card: `[![RepoGauge](https://site/api/og?repo=owner/name)](https://site/r/owner/name)`
@@ -568,6 +602,16 @@ Both are properties of the tip provider, not the rubric — the points are still
 2. "Copy Markdown" writes to the clipboard; "Download PNG" fetches `/api/og` and triggers a download with filename `RepoGauge-{owner}-{name}.png`.
 
 Both snippets wrap the image in a link back to the result page — that link is the acquisition loop and it is not optional.
+
+**[M5] The fix plan — `/api/plan`.** The tip list under "What to fix" carries a `Download the full plan as Markdown` link. The file is a brief addressed to a coding agent: the score, the five categories as a table, every unearned check as a checkbox with the points it recovers and the rubric's advice, the checks that cannot be acted on, and the checks that already pass. Three properties define it:
+
+- **Uncapped.** The page shows `MAX_TIPS` (6) so the list stays readable; the file lists every check that lost a point. Truncating it would silently redefine "everything that needs fixing" as "the first six things".
+- **It names what cannot be fixed.** Stars and forks are scored but never advised on (§8). Omitting them from a file whose header promises a reachable total would leave an agent to conclude the arithmetic is wrong, or to try to manufacture them. The header states the reachable score — `total + actionable`, which for a young repo lands near 85 and makes §12's open question concrete.
+- **It carries no repository description.** Descriptions are attacker-controlled by anyone who can create a repository (§9). This file is written to disk and pasted into an agent's context, so it is built from the slug and the rubric's own strings and nothing else. A test pins the input shape so a later edit cannot quietly add one.
+
+Like `/api/og`, the route accepts only a slug and re-derives the score server-side; a route that rendered numbers handed to it in a query string would turn a file designed to be pasted into an agent into an injection vector. Unlike `/api/og` it does **not** set `neverRefresh` — nothing embeds it, so there is no Camo traffic to defend against, and it is charged against the caller's cold-score budget exactly like the result page.
+
+`lib/fix-plan.ts` renders it and is pure, for the same reason `lib/badge.ts` is: it is a rendering of a score, not a computation of one.
 
 ### Flow D — Trending
 
@@ -843,6 +887,15 @@ Numbered so any one can be rejected without reopening the rest.
 9. **No analytics beyond Vercel's built-in.** Adding PostHog or similar means a cookie banner conversation this product currently doesn't need.
 10. **English only, LTR only.** No i18n layer; strings live in components. Retrofitting is real work — reject this now if a second language is ever likely.
 11. **`readmeBytes` uses the `size` field from the readme endpoint; content is never fetched or decoded.** Cheaper and sufficient for a length heuristic, but it means a README that is 8KB of badges scores the same as 8KB of prose. Rejecting this adds a base64 decode and a heuristic for "real" content.
+
+12. **[M5] `DEMO_MODE=1` runs the whole interface against bundled fixtures, with no GitHub token and no database.** Added because the app is otherwise unreachable without three credentials, and the one thing it most needs — someone looking at it — is the one thing that gated on all three. Four properties keep it from becoming the "quietly degrade to anonymous GitHub" fallback §8 forbids:
+
+    - **It must be asked for by name.** There is no inference, no fallback, and no way to arrive in it by accident: the flag is either `1` or the app demands its credentials exactly as before.
+    - **It makes no outbound call at all.** Not a degraded fetch — zero. `getOrComputeScore` and `getTrending` short-circuit before any IO, so GitHub, Postgres, and the rate limiter are all unreachable rather than merely unused. Nothing is left to abuse, which is why dropping the rate limiter with it is safe.
+    - **Every page says so.** A persistent banner in `app/layout.tsx`, on every route, so no screenshot of a demo score can be mistaken for a real one.
+    - **Only the input is canned.** The rubric, the tips, the card, the badge, and the star floor on `/trending` are the production implementations running on fixtures captured from the live six-call fan-out. A demo that scored differently from production would be worse than no demo.
+
+    Recency is stored as `pushedDaysAgo` and materialised against the clock at read time, so the fixtures do not rot toward "abandoned" as they age. Rejecting this assumption costs nothing in the live path — delete `lib/demo/`, the flag, and four short branches.
 
 ---
 

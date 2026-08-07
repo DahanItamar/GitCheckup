@@ -1,6 +1,7 @@
 import { after } from "next/server";
 
-import { RUBRIC_VERSION } from "@/lib/config";
+import { DEMO_MODE, RUBRIC_VERSION } from "@/lib/config";
+import { findDemoSignals } from "@/lib/demo/repos";
 import { findLatestScore, saveScore, type CachedScore } from "@/lib/db/scores";
 import { RepoGaugeError } from "@/lib/errors";
 import { GitHubError } from "@/lib/github/errors";
@@ -60,6 +61,12 @@ export async function getOrComputeScore(
   options?: ScoreRepoOptions,
 ): Promise<ScoredRepo> {
   const now = new Date();
+
+  // Demo mode short-circuits before any IO: no GitHub, no Postgres, no rate
+  // limiter. Everything downstream — rubric, tips, card, badge — is the real
+  // implementation running on canned input.
+  if (DEMO_MODE) return demoScore(slug, now);
+
   const cached = await readCache(slug);
 
   const action = options?.forceRefresh
@@ -92,6 +99,24 @@ export async function getOrComputeScore(
   await chargeColdScore(options?.clientIp, now);
 
   return computeAndPersist(slug, now, cached);
+}
+
+/**
+ * A fixture scored by the real rubric. An unknown slug is a genuine
+ * REPO_NOT_FOUND — the demo has a fixed set of repos and says so rather than
+ * inventing a score for whatever was typed.
+ */
+async function demoScore(slug: RepoSlug, now: Date): Promise<ScoredRepo> {
+  const signals = findDemoSignals(slug, now);
+  if (signals === null) throw new RepoGaugeError("REPO_NOT_FOUND");
+
+  return {
+    repo: { owner: signals.owner, name: signals.name, stars: signals.stars },
+    score: await scoreSignals(signals, now),
+    fetchedAt: now.toISOString(),
+    cached: false,
+    stale: false,
+  };
 }
 
 /* -------------------------------------------------------------------------

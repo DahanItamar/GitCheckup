@@ -58,7 +58,7 @@ const TIP_TEXT: Record<string, string> = {
  * anyone can take, and because those checks lose the most points on a small
  * repo they would otherwise crowd out every fixable item on the list.
  */
-const NOT_ACTIONABLE = new Set(["star-count", "fork-count"]);
+export const NOT_ACTIONABLE = new Set(["star-count", "fork-count"]);
 
 export class RuleTipProvider implements TipProvider {
   generate(signals: RepoSignals, categories: CategoryScore[]): Promise<Tip[]> {

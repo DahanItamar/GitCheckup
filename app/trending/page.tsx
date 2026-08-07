@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { RepoInput } from "@/components/RepoInput";
 import { SuggestionChips, TrendingList } from "@/components/TrendingList";
+import { DEMO_MODE } from "@/lib/config";
 import { SEED_REPOS, getTrending } from "@/lib/services/trending";
 
 /**
@@ -26,8 +27,12 @@ export default async function TrendingPage() {
     <div className="mx-auto max-w-3xl px-6 py-16">
       <h1 className="text-3xl font-semibold tracking-tight">Trending</h1>
       <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted">
-        The best-scoring repositories anyone has looked up in the last seven
-        days, with at least 50 stars.
+        {/* In demo mode there is no lookup history to rank — the board is the
+            bundled fixture set. The banner says the scores are canned; saying
+            "anyone has looked up" here would still be a plain untruth. */}
+        {DEMO_MODE
+          ? "The bundled demo repositories with at least 50 stars, ranked by score."
+          : "The best-scoring repositories anyone has looked up in the last seven days, with at least 50 stars."}
       </p>
 
       <div className="mt-10">

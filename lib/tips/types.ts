@@ -12,10 +12,11 @@ export interface TipProvider {
   generate(signals: RepoSignals, categories: CategoryScore[]): Promise<Tip[]>;
 }
 
-/** Tips shown on the result page. */
+/**
+ * Tips shown on the result page. The downloadable fix plan is uncapped — see
+ * `lib/fix-plan.ts`; a file fed to an agent must not silently define
+ * "everything to fix" as "the first six things".
+ */
 export const MAX_TIPS = 6;
-
-/** Tips that fit in the 1200×630 share card (SPEC §6). */
-export const OG_TIP_COUNT = 3;
 
 export type { Tip };

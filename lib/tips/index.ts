@@ -20,5 +20,6 @@ export function getTipProvider(): TipProvider {
   return cached;
 }
 
-export { MAX_TIPS, OG_TIP_COUNT } from "./types";
+export { NOT_ACTIONABLE } from "./rules";
+export { MAX_TIPS } from "./types";
 export type { TipProvider } from "./types";

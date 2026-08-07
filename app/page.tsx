@@ -13,17 +13,23 @@ export default async function Home() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-20 sm:py-28">
-      <h1 className="max-w-xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-        How good is that repo, really?
+      <h1 className="animate-rise max-w-2xl text-5xl font-semibold tracking-[-0.03em] text-balance sm:text-6xl">
+        How good is that repo, <span className="text-accent">really?</span>
       </h1>
 
-      <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
+      <p
+        className="animate-rise mt-6 max-w-lg text-base leading-relaxed text-muted"
+        style={{ animationDelay: "60ms" }}
+      >
         Paste a GitHub repository. Get one number out of 100, the five
         categories behind it, and a short list of what to fix. No sign-in, no
         permissions, nothing installed.
       </p>
 
-      <div className="mt-10 max-w-xl">
+      <div
+        className="animate-rise mt-10 max-w-xl"
+        style={{ animationDelay: "120ms" }}
+      >
         <RepoInput autoFocus />
       </div>
 

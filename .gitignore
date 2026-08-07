@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code — local machine config: permission allowlists and plugin
+# enable/disable flags. Personal to whoever cloned this, never the project's.
+.claude/

@@ -9,25 +9,50 @@ import { z } from "zod";
  * into an obvious startup error.
  */
 
+/**
+ * Demo mode: score bundled fixtures instead of reaching GitHub or Postgres, so
+ * the interface can be run with no credentials at all (SPEC §11.12).
+ *
+ * This is not the "unauthenticated fallback" §8 forbids. That would be the app
+ * quietly degrading to anonymous GitHub calls under a real workload. This makes
+ * no outbound call whatsoever, must be asked for by name, and says so on every
+ * page — nobody can arrive in it by accident or mistake its output for real.
+ */
+export const DEMO_MODE = process.env.DEMO_MODE === "1";
+
+/** In demo mode a credential is never used, so it is never demanded. */
+const credential = (real: z.ZodType<string>, placeholder: string) =>
+  DEMO_MODE ? z.string().default(placeholder) : real;
+
 const envSchema = z.object({
   /** Fine-grained PAT: public repository read only, zero write scopes. */
-  GITHUB_TOKEN: z.string().min(1, "GITHUB_TOKEN is required"),
+  GITHUB_TOKEN: credential(
+    z.string().min(1, "GITHUB_TOKEN is required"),
+    "demo-mode-no-token",
+  ),
 
   /**
    * HMAC key for hashing caller IPs before storage. Required from M4: a
    * predictable key would make the stored hashes reversible by anyone who
    * can guess an IP, which is the whole point of hashing them.
    */
-  RATE_LIMIT_SECRET: z
-    .string()
-    .min(16, "RATE_LIMIT_SECRET must be at least 16 characters"),
+  RATE_LIMIT_SECRET: credential(
+    z.string().min(16, "RATE_LIMIT_SECRET must be at least 16 characters"),
+    "demo-mode-no-secret-needed",
+  ),
 
   /**
    * Neon connection string. Required from M2 for the same reason as the
    * token: a cache that silently isn't caching is exactly the "dies
    * mysteriously under load" failure this app refuses to boot into.
    */
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  // The placeholder is well-formed on purpose: `neon()` validates the string's
+  // shape when lib/db/client.ts is imported, which happens even in demo mode
+  // because the import graph is static. It is never connected to.
+  DATABASE_URL: credential(
+    z.string().min(1, "DATABASE_URL is required"),
+    "postgresql://demo:demo@demo.invalid/demo",
+  ),
 
   /** v1 accepts exactly one provider. The seam exists; the choice does not. */
   TIPS_PROVIDER: z.literal("rules").default("rules"),

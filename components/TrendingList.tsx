@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import type { Grade } from "@/lib/score/types";
 
-import { gradeColor } from "./grade-color";
+import { gradeChip, gradeColor } from "./grade-color";
+import { ArrowRightIcon, StarIcon } from "./icons";
 
 /**
  * Declared here rather than imported from lib/db: components take props, and
@@ -29,24 +30,30 @@ export function TrendingList({ repos }: { repos: TrendingItem[] }) {
         <li key={`${repo.owner}/${repo.name}`}>
           <Link
             href={`/r/${repo.owner}/${repo.name}`}
-            className="flex items-center gap-4 py-3.5 transition-colors duration-150 hover:bg-surface"
+            className="group flex items-center gap-4 px-2 py-3 transition-colors duration-150 hover:bg-surface"
           >
-            <span className="w-6 shrink-0 text-right font-mono text-xs tabular-nums text-faint">
+            <span className="w-5 shrink-0 text-right font-mono text-xs tabular-nums text-faint">
               {index + 1}
             </span>
             <span className="min-w-0 flex-1 truncate font-mono text-sm">
               <span className="text-muted">{repo.owner}/</span>
               {repo.name}
             </span>
-            <span className="shrink-0 text-xs tabular-nums text-faint">
+            <span className="flex shrink-0 items-center gap-1 text-xs tabular-nums text-faint">
+              <StarIcon className="size-3" />
               {formatStars(repo.stars)}
             </span>
+            {/* The score is the row's verdict, so it gets the only fill in it. */}
             <span
-              className="w-10 shrink-0 text-right text-sm font-medium tabular-nums"
-              style={{ color: gradeColor(repo.grade) }}
+              className="w-11 shrink-0 rounded-md py-1 text-center text-sm font-semibold tabular-nums"
+              style={{
+                color: gradeColor(repo.grade),
+                backgroundColor: gradeChip(repo.grade),
+              }}
             >
               {repo.total}
             </span>
+            <ArrowRightIcon className="size-3.5 shrink-0 text-faint opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
           </Link>
         </li>
       ))}
@@ -66,7 +73,7 @@ export function SuggestionChips({
         <li key={`${repo.owner}/${repo.name}`}>
           <Link
             href={`/r/${repo.owner}/${repo.name}`}
-            className="inline-block rounded-full border border-border bg-surface px-3 py-1.5 font-mono text-xs text-muted transition-colors duration-150 hover:border-border-strong hover:text-ink"
+            className="inline-flex min-h-11 items-center rounded-full border border-border bg-surface px-4 font-mono text-xs text-muted shadow-rest transition-[color,border-color,box-shadow] duration-150 hover:border-border-strong hover:text-ink hover:shadow-lift"
           >
             {repo.owner}/{repo.name}
           </Link>
@@ -76,7 +83,8 @@ export function SuggestionChips({
   );
 }
 
+/** The star glyph moved into `StarIcon`, so this returns the count alone. */
 function formatStars(stars: number): string {
-  if (stars >= 1000) return `${Math.round(stars / 100) / 10}k★`;
-  return `${stars}★`;
+  if (stars >= 1000) return `${Math.round(stars / 100) / 10}k`;
+  return `${stars}`;
 }

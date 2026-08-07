@@ -5,7 +5,8 @@
 Deciding whether an unfamiliar repo is worth adopting means opening six tabs. Is
 there a LICENSE? Is it still maintained? Does CI run? Is the README more than a
 title? RepoGauge answers all of that with one number, the five categories behind
-it, and a short list of what to fix.
+it, and a short list of what to fix — which you can download as a Markdown brief
+and hand straight to a coding agent.
 
 ```
 vercel/next.js      95  A+     rust-lang/rust      94  A+
@@ -25,9 +26,10 @@ purpose.
 ## Status
 
 **All five milestones are written.** Paste a repo and you get a live score, a
-breakdown, ranked fixes, a share card, a badge, and a leaderboard.
+breakdown, ranked fixes, a downloadable fix plan, a share card, a badge, and a
+leaderboard.
 
-**209 tests, and the database half is covered too.** The migrations and every
+**249 tests, and the database half is covered too.** The migrations and every
 query run against real Postgres in CI — [PGlite](https://pglite.dev), which is
 Postgres compiled to WebAssembly, so `DISTINCT ON`, `jsonb`, `ON CONFLICT` and
 the CHECK constraints behave exactly as they will in production. No credentials
@@ -49,6 +51,26 @@ Full plan in [docs/SPEC.md](docs/SPEC.md).
 ---
 
 ## Running it
+
+### Just to look at it
+
+```bash
+pnpm install
+echo "DEMO_MODE=1" > .env
+pnpm dev          # http://localhost:3000
+```
+
+No token, no database, no account. Demo mode scores a set of bundled fixtures —
+captured from the live GitHub API with the same six-call fan-out production
+uses — with the real rubric, the real tips, the real card and badge. Only the
+input is canned, and every page says so in a banner. It makes no outbound call
+of any kind.
+
+Two of the fixtures are deliberately bad repositories, linked from the landing
+page under "try one", because a failing grade and its fix list are half of what
+the product is for.
+
+### For real
 
 You need Node 20+, pnpm, a GitHub token, and a Postgres database.
 
@@ -103,6 +125,24 @@ Grades: **A+** ≥90 · **A** 80–89 · **B** 70–79 · **C** 60–69 · **D**
 The exact per-check weights are in [docs/SPEC.md §5](docs/SPEC.md) and
 implemented in [`lib/score/rubric.ts`](lib/score/rubric.ts).
 
+### The fix plan
+
+Under "What to fix", **Download plan · Markdown** returns the whole list as a
+file (`/api/plan?repo=owner/repo`), written to be handed to a coding agent. It
+differs from the page in three ways that matter:
+
+- **It is uncapped.** The page shows six tips so it stays readable; the file
+  lists every check that lost a point.
+- **It names what cannot be fixed.** Stars and forks are scored but never
+  advised on, so the file states them separately and reports the reachable
+  score — `total + actionable` — rather than implying 100 is in range.
+- **It says what already passes**, so an agent editing the repository knows
+  what not to break.
+
+It carries no repository description, because descriptions are attacker-
+controlled by anyone who can create a repo and this file is built to be pasted
+into an agent's context.
+
 ### Three things the score does not claim
 
 - **Popularity is scored but never advised on.** "Get more stars" is not an
@@ -128,6 +168,9 @@ lib/github/   the only code that calls api.github.com
 lib/score/    the pure rubric: RepoSignals → ScoreResult. Imports nothing.
 lib/tips/     failed checks → ordered advice, behind a provider interface
 lib/services/ orchestration: the one seam where fetch, score and cache meet
+lib/badge.ts  ┐ pure renderers: a finished score in, bytes out.
+lib/fix-plan.ts ┘ No IO, fully tested, routes stay a dozen lines.
+lib/demo/     bundled fixtures for DEMO_MODE
 components/   presentational only. They take props.
 ```
 

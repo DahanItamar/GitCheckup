@@ -6,9 +6,8 @@ import {
   FallbackShareCard,
   ShareCard,
 } from "@/components/ShareCard";
-import { IMAGE_CACHE_SECONDS } from "@/lib/config";
+import { IMAGE_CACHE_SECONDS, SITE_URL } from "@/lib/config";
 import { parseRepoSlug } from "@/lib/repo-slug";
-import { OG_TIP_COUNT } from "@/lib/tips";
 import { getOrComputeScore, type ScoredRepo } from "@/lib/services/score-repo";
 
 /**
@@ -46,7 +45,7 @@ export async function GET(request: Request): Promise<Response> {
       total={result.score.total}
       grade={result.score.grade}
       categories={result.score.categories}
-      tips={result.score.tips.slice(0, OG_TIP_COUNT)}
+      siteUrl={SITE_URL}
     />,
   );
 }
@@ -78,5 +77,5 @@ function card(element: React.ReactElement): Response {
 }
 
 function fallback(label: string): Response {
-  return card(<FallbackShareCard label={label} />);
+  return card(<FallbackShareCard label={label} siteUrl={SITE_URL} />);
 }

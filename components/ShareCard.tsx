@@ -1,4 +1,4 @@
-import type { CategoryScore, Grade, Tip } from "@/lib/score/types";
+import type { CategoryScore, Grade } from "@/lib/score/types";
 
 /**
  * The 1200×630 card rendered by `/api/og` (SPEC §6).
@@ -27,18 +27,63 @@ const GRADE_HEX: Record<Grade, string> = {
   F: "#e26760",
 };
 
+/**
+ * A category bar's colour comes from what that category earned, not from the
+ * repo's overall grade. Painting all five in the grade colour made a 0/25 and
+ * a 25/25 identical, which is the one thing a reader takes from the card at a
+ * glance. Mirrors `components/grade-color.ts`, in hex because Satori resolves
+ * no custom properties.
+ */
+function ratioHex(ratio: number): string {
+  if (ratio >= 0.9) return GRADE_HEX["A+"];
+  if (ratio >= 0.7) return GRADE_HEX.B;
+  if (ratio >= 0.5) return GRADE_HEX.C;
+  if (ratio >= 0.3) return GRADE_HEX.D;
+  return GRADE_HEX.F;
+}
+
+/** Pre-mixed against `CANVAS` — Satori supports no `color-mix()`. */
+const GRADE_TINT: Record<Grade, string> = {
+  "A+": "#16241d",
+  A: "#16241d",
+  B: "#20261a",
+  C: "#282218",
+  D: "#281e16",
+  F: "#281817",
+};
+
 /** Long repo names must not push the score off the card (SPEC §8). */
 function truncate(value: string, max: number): string {
   return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
 }
 
+/**
+ * `https://repogauge.app` → `repogauge.app`. The scheme is noise on a card
+ * nobody can click, and on localhost the port has to survive or the label
+ * names a host that is not the one that rendered it.
+ */
+function siteLabel(siteUrl: string): string {
+  try {
+    return new URL(siteUrl).host;
+  } catch {
+    return siteUrl;
+  }
+}
+
+/**
+ * The card states the result and stops there. It is embedded in READMEs, where
+ * a list of the repository's own shortcomings is the last thing its author
+ * wants rendered — and the fix list has its own home now: `/api/plan`, a
+ * Markdown brief you download rather than publish.
+ */
 interface ShareCardProps {
   owner: string;
   name: string;
   total: number;
   grade: Grade;
   categories: CategoryScore[];
-  tips: Tip[];
+  /** Absolute, so the footer can name where the score came from. */
+  siteUrl: string;
 }
 
 export function ShareCard({
@@ -47,7 +92,7 @@ export function ShareCard({
   total,
   grade,
   categories,
-  tips,
+  siteUrl,
 }: ShareCardProps) {
   const accent = GRADE_HEX[grade];
 
@@ -72,9 +117,12 @@ export function ShareCard({
           <div
             style={{
               display: "flex",
-              fontSize: 30,
+              fontSize: 28,
               color: accent,
-              paddingBottom: 12,
+              backgroundColor: GRADE_TINT[grade],
+              borderRadius: 10,
+              padding: "4px 14px",
+              marginBottom: 14,
             }}
           >
             {grade}
@@ -93,7 +141,11 @@ export function ShareCard({
                 style={{
                   display: "flex",
                   width: `${Math.round((category.earned / category.available) * 100)}%`,
-                  backgroundColor: accent,
+                  backgroundColor: ratioHex(
+                    category.available === 0
+                      ? 0
+                      : category.earned / category.available,
+                  ),
                   borderRadius: 5,
                 }}
               />
@@ -105,20 +157,10 @@ export function ShareCard({
         ))}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {tips.map((tip) => (
-          <div
-            key={tip.checkId}
-            style={{ display: "flex", fontSize: 22, color: MUTED }}
-          >
-            + {truncate(tip.text, 96)}
-          </div>
-        ))}
-      </div>
-
       <div style={footer}>
         <div style={{ display: "flex", color: FAINT }}>
           repo<span style={{ color: accent }}>gauge</span>
+          <span style={{ paddingLeft: 10 }}>{siteLabel(siteUrl)}</span>
         </div>
         <div style={{ display: "flex", color: FAINT }}>
           Scored on public GitHub data
@@ -129,7 +171,13 @@ export function ShareCard({
 }
 
 /** The card shown when a repo cannot be scored — always at status 200. */
-export function FallbackShareCard({ label }: { label: string }) {
+export function FallbackShareCard({
+  label,
+  siteUrl,
+}: {
+  label: string;
+  siteUrl: string;
+}) {
   return (
     <div
       style={{
@@ -147,7 +195,7 @@ export function FallbackShareCard({ label }: { label: string }) {
       </div>
       <div style={{ display: "flex", fontSize: 24, color: FAINT }}>
         repo<span style={{ color: "#5fbf8b" }}>gauge</span>
-        <span style={{ paddingLeft: 8 }}>— scored on public GitHub data</span>
+        <span style={{ paddingLeft: 8 }}>{siteLabel(siteUrl)}</span>
       </div>
     </div>
   );

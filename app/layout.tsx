@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 
+import { DEMO_MODE } from "@/lib/config";
+
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,6 +36,20 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
+        {DEMO_MODE && (
+          <div
+            role="status"
+            className="border-b px-6 py-2 text-center text-xs"
+            style={{
+              borderColor: "var(--grade-c)",
+              color: "var(--grade-c)",
+            }}
+          >
+            <strong className="font-medium">Demo mode</strong> — scores are
+            computed by the real rubric from bundled fixtures, not from live
+            GitHub data.
+          </div>
+        )}
         <header className="border-b border-border">
           <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
             <Link
