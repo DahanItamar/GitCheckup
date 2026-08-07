@@ -144,9 +144,11 @@ does nothing. The app ships its own headers — see `next.config.ts`.
 Cloudflare proxying. Behind the orange cloud nginx sees a Cloudflare edge
 address as `$remote_addr`, so `x-real-ip` would put every visitor in one
 rate-limit bucket to throttle each other; `CF-Connecting-IP` carries the real
-client and Cloudflare strips any client-supplied copy. **While the cloud is
-grey this header does not arrive**, so `clientIpFrom` returns undefined and
-the limiter fails open — deliberate, and much safer than a shared bucket.
+client and Cloudflare strips any client-supplied copy. The cloud is **orange**, so the header arrives. Verified end to end rather
+than assumed: a cold score through Cloudflare moved a `rate_limit_hits`
+counter from 3 to 4. Had the header been missing, `chargeColdScore` returns
+early and nothing would have changed — the row count alone proves nothing,
+because `recordHit` upserts.
 
 Two things that must hold once the cloud is orange:
 
