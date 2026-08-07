@@ -1,6 +1,6 @@
 # GitCheckup
 
-[![GitCheckup](https://gitcheckup.com/api/badge?repo=DahanItamar/GitCheckup)](https://gitcheckup.com/r/DahanItamar/GitCheckup)
+[![GitCheckup](https://gitcheckup.com/api/badge?repo=DahanItamar/GitCheckup&style=card)](https://gitcheckup.com/r/DahanItamar/GitCheckup)
 
 **Score any public GitHub repo out of 100 — in one paste, with zero permissions.**
 
@@ -111,8 +111,14 @@ makes those hashes reversible. Generate one with
 ## Put it in your README
 
 ```markdown
-[![GitCheckup](https://gitcheckup.com/api/badge?repo=OWNER/REPO)](https://gitcheckup.com/r/OWNER/REPO)
+[![GitCheckup](https://gitcheckup.com/api/badge?repo=OWNER/REPO&style=card)](https://gitcheckup.com/r/OWNER/REPO)
 ```
+
+Three styles. `card` is the one above — a dark card with the score as the
+hero, meant to sit on its own line. `flat` is the default and the classic
+20-pixel shape that lines up beside CI and licence badges; `flat-square` is
+the same without the sheen. Add `&style=flat` or `&style=flat-square` for
+those.
 
 The badge at the top of this file is that snippet, pointed at this repository —
 so it is also the live proof the endpoint works.

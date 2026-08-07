@@ -112,3 +112,57 @@ describe("what makes it look right rather than merely correct", () => {
     expect(svg.match(/<rect/g)?.length).toBe(4); // clip + label + value + sheen
   });
 });
+
+describe("the card style", () => {
+  it("is opt-in — flat stays the default", () => {
+    // The snippet is already in READMEs. Changing what the default renders
+    // would resize a badge inside someone else's document.
+    expect(parseBadgeStyle(null)).toBe("flat");
+    expect(parseBadgeStyle("card")).toBe("card");
+  });
+
+  it("sizes itself to its content", () => {
+    // The prototype hardcoded one width, which held only for a two-digit
+    // score and a one-letter grade.
+    const widthOf = (svg: string) => Number(/width="(\d+)"/.exec(svg)![1]);
+
+    expect(widthOf(scoreBadge(100, "A+", "card"))).toBeGreaterThan(
+      widthOf(scoreBadge(9, "F", "card")),
+    );
+  });
+
+  it("brings its own background rather than borrowing the reader's", () => {
+    // The whole reason for this style: grade colours cannot be tuned for a
+    // white and a near-black README at once, so it supplies its own ground.
+    expect(scoreBadge(85, "A", "card")).toContain("#1b1f24");
+  });
+
+  it("shows the grade colour only on the spine and the letter", () => {
+    const svg = scoreBadge(31, "F", "card");
+    expect(svg.match(/#a8322f/g)).toHaveLength(2);
+  });
+
+  it("drops the number, grade and /100 when there is no score", () => {
+    // A hero figure that does not exist is worse than no card.
+    const svg = unknownBadge("card");
+
+    expect(svg).toContain("unknown");
+    expect(svg).not.toContain("/ 100");
+    // Label and the word "unknown", and nothing else — no grade block.
+    expect(svg.match(/<text/g)).toHaveLength(2);
+    expect(scoreBadge(85, "A", "card").match(/<text/g)).toHaveLength(4);
+  });
+
+  it("still says what it is to a screen reader", () => {
+    expect(scoreBadge(85, "A", "card")).toContain(
+      'aria-label="gitcheckup: 85 A"',
+    );
+  });
+
+  it("gives each card a unique clip id, so two on one page do not collide", () => {
+    const a = /id="([^"]+)"/.exec(scoreBadge(85, "A", "card"))![1];
+    const b = /id="([^"]+)"/.exec(scoreBadge(31, "F", "card"))![1];
+
+    expect(a).not.toBe(b);
+  });
+});
