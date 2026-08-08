@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh the nginx Cloudflare allowlist weekly
+
+[Timer]
+# Cloudflare adds ranges rarely, but a stale allowlist 403s real visitors, so
+# this is not optional maintenance. Randomised so every host on this list does
+# not fetch at the same second.
+OnCalendar=weekly
+RandomizedDelaySec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

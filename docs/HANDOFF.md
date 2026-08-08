@@ -157,15 +157,29 @@ counter from 3 to 4. Had the header been missing, `chargeColdScore` returns
 early and nothing would have changed — the row count alone proves nothing,
 because `recordHit` upserts.
 
+**The origin refuses anything that did not come through Cloudflare.** That is
+not only a DDoS shield: the reason `cf-connecting-ip` can be trusted at all is
+that Cloudflare overwrites whatever the caller sent, so a caller reaching the
+origin directly could write it themselves and take an unlimited number of cold
+scores off the GitHub budget. Measured after the change — proxied requests 200,
+direct-to-origin 403, including with a forged `CF-Connecting-IP`.
+
+The ranges go stale, and a stale allowlist 403s real visitors, so
+`cloudflare-ips.timer` regenerates them weekly. If the site ever returns 403 to
+everyone, `journalctl -u cloudflare-ips.service` is the first place to look.
+The vhost, the script and the units are all in [`deploy/`](../deploy/).
+
 Two things that must hold once the cloud is orange:
 
 - **Cloudflare SSL/TLS mode must be Full (strict).** Certbot added an
   HTTP→HTTPS redirect to the vhost; on _Flexible_, Cloudflare would fetch over
   HTTP, get redirected to HTTPS, and loop until the site is down.
 - **Certificate renewal uses HTTP-01**, which normally survives proxying
-  because Cloudflare forwards `/.well-known/acme-challenge/` to the origin. If
-  a renewal ever fails, switch this domain to DNS-01. Next renewal is due
-  around 2026-10-06.
+  because Cloudflare forwards `/.well-known/acme-challenge/` to the origin, and
+  survives the allowlist because the port-80 block is not restricted.
+  `certbot renew --dry-run` passes for both vhosts as of 2026-08-08. If a
+  renewal ever fails, switch this domain to DNS-01. Next renewal is due around
+  2026-10-06.
 
 ---
 

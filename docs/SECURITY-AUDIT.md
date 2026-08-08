@@ -22,11 +22,12 @@ assessment of the code and have not been exploited or disproved.
 | #   | Finding                                                       | Severity                | Status                                 |
 | --- | ------------------------------------------------------------- | ----------------------- | -------------------------------------- |
 | 1   | No security response headers on any route                     | **Moderate**            | **Fixed** in `next.config.ts`          |
-| 2   | `esbuild` advisory via `drizzle-kit` (dev only)               | **Low**                 | Open, not exploitable in production    |
-| 3   | Upstream values interpolated into a redirect path unvalidated | **Low**                 | Open, defence-in-depth                 |
+| 2   | `esbuild` advisory via `drizzle-kit` (dev only)               | **Low**                 | **Fixed** — pnpm override              |
+| 3   | Upstream values interpolated into a redirect path unvalidated | **Low**                 | **Fixed** — re-parsed before redirect  |
 | 4   | Rate limiter fails open                                       | Info                    | Deliberate, documented                 |
 | 5   | `x-forwarded-for` trusted                                     | **Moderate** off Vercel | **Fixed** — `TRUSTED_CLIENT_IP_HEADER` |
 | 6   | Database role has full DDL rights                             | Info                    | Accepted                               |
+| 7   | Origin reachable without Cloudflare                           | **Moderate**            | **Fixed** — nginx allowlist            |
 
 No high or critical findings. The classic web vulnerabilities — SQL injection,
 XSS, SSRF, secret leakage — are all closed, several of them structurally
@@ -79,7 +80,7 @@ that nothing renders attacker-controlled text.
 was checked with `curl`. Worth one pass over the landing page, a result page,
 Download card, Copy, and Rescore before launch.
 
-## 2. `esbuild` advisory via `drizzle-kit` · Low · **measured**
+## 2. `esbuild` advisory via `drizzle-kit` · Low · **measured** · FIXED
 
 ```
 moderate │ esbuild enables any website to send any requests to the
@@ -95,11 +96,26 @@ One vulnerability, and it is **not in the production path**: `drizzle-kit` is a
 to Vercel. The realistic exposure is a developer running `pnpm db:*` while
 visiting a hostile page.
 
-**Fix:** none available today — it is transitive through an unmaintained
-`@esbuild-kit` chain that `drizzle-kit` pins. Track `drizzle-kit` for an
-update. Do not add an override without checking `drizzle-kit` still runs.
+**Fixed** with a pnpm override, after checking what the audit's own advice
+warned about.
 
-## 3. Upstream values interpolated into a redirect path · Low · **read**
+`drizzle-kit@0.31.10` — the current release — depends on `esbuild ^0.25.4`
+directly _and_ on `@esbuild-kit/esm-loader`, which drags in the vulnerable
+`0.18.20`. The `@esbuild-kit/*` packages are deprecated and were folded into
+`tsx`, which `drizzle-kit` also already depends on, so that chain is
+vestigial rather than load-bearing. Pinning it:
+
+```json
+"pnpm": { "overrides": { "@esbuild-kit/core-utils>esbuild": "^0.25.0" } }
+```
+
+Verified rather than assumed: `pnpm audit` reports clean, no `esbuild` below
+`0.25.12` remains in the tree, and `pnpm db:generate` still loads
+`drizzle.config.ts` and `lib/db/schema.ts` through that loader and reads all
+four tables. `pnpm db:migrate` was not re-run against production — it goes
+through the same loader, and the migrations are already applied.
+
+## 3. Upstream values interpolated into a redirect path · Low · **read** · FIXED
 
 `app/r/[owner]/[repo]/page.tsx:121`
 
@@ -119,8 +135,11 @@ gap rather than a live vulnerability — the app's stated rule is that
 everything crossing the boundary is validated, and this is the one place that
 relies on an upstream's good behaviour instead.
 
-**Fix:** run `canonical` back through `parseRepoSlug` and fall through to
-rendering if it fails.
+**Fixed.** `canonical` is re-parsed through `parseRepoSlug` and the redirect
+target is built by `slugPath`, so the only strings that reach a URL are ones
+that matched the same expressions as user input. A slug that fails to parse
+falls through and renders under the requested name, which `repo_aliases`
+already resolves to a cache hit.
 
 ## 4–6. Accepted risks
 
@@ -128,7 +147,7 @@ rendering if it fails.
   counter allows the request. Deliberate and logged: it guards a budget, not a
   secret, and failing closed would take the site down when Neon hiccups.
 - **`x-forwarded-for` is trusted** (`lib/client-ip.ts`) — **fixed for
-  self-hosting.** A reverse proxy _appends_ to this header, so a caller who
+  self-hosting**, and see Finding 7, which closes the other half of it. A reverse proxy _appends_ to this header, so a caller who
   sends `X-Forwarded-For: 1.2.3.4` occupies the left-most slot the code reads
   and picks their own rate-limit bucket. Harmless on Vercel, which rewrites the
   header; a real bypass behind nginx, Caddy, Traefik or Cloudflare, which is
@@ -140,6 +159,44 @@ rendering if it fails.
   option; a role without DDL rights would be an improvement if migrations were
   ever split from runtime. Low value while the entire database is a rebuildable
   cache.
+
+---
+
+## 7. The origin answered anyone who found its address · Moderate · FIXED
+
+Cloudflare proxies `gitcheckup.com`, but nginx accepted connections from
+anywhere. Two consequences, and the second is the one that matters:
+
+1. Cloudflare's rate limiting, caching and TLS could be walked around by
+   anyone who learned the origin IP.
+2. **The per-IP cold-score limit could be defeated outright.**
+   `TRUSTED_CLIENT_IP_HEADER=cf-connecting-ip` is safe _because Cloudflare
+   overwrites that header_. A caller reaching the origin directly writes it
+   themselves, picks a fresh bucket per request, and takes an unbounded number
+   of cold scores off the 5000/hr GitHub budget. Finding 5 closed the
+   `x-forwarded-for` bypass; this was the same bypass through the header that
+   replaced it.
+
+**Fixed** in the nginx vhost — see [`deploy/`](../deploy/). Requests whose
+`$realip_remote_addr` is outside Cloudflare's published ranges get a 403;
+`real_ip` separately rewrites `$remote_addr` from `CF-Connecting-IP` so the
+app and the logs still see the visitor. The ranges are regenerated weekly by a
+systemd timer, because a stale allowlist 403s real people.
+
+Measured after the change:
+
+| Request                                         | Before  | After   |
+| ----------------------------------------------- | ------- | ------- |
+| `https://gitcheckup.com/` via Cloudflare        | 200     | 200     |
+| Direct to origin IP, `Host: gitcheckup.com`     | 200     | 403     |
+| Direct to origin with forged `CF-Connecting-IP` | 200     | 403     |
+| `/api/badge` direct to origin                   | 200     | 403     |
+| nginx access-log address for a proxied request  | CF edge | visitor |
+
+`certbot renew --dry-run` passes for both vhosts afterwards — the port-80
+block that answers the ACME challenge is not restricted.
+
+---
 
 ---
 
@@ -265,13 +322,16 @@ and hold no security decision.
 | `app/r/[owner]/[repo]/actions.ts`                 | Server Action             | Re-parses input; rate-limited                                                                          |
 | `components/TrendingList.tsx`, `ImprovedList.tsx` | Public listing            | Render only `owner/name` and numbers, deliberately                                                     |
 | `components/ShareCard.tsx`                        | Rendered image            | Satori, no descriptions, truncated slugs                                                               |
-| `next.config.ts`                                  | Response headers          | **Finding 1** — no headers block                                                                       |
+| `next.config.ts`                                  | Response headers          | **Finding 1** — fixed                                                                                  |
+| `deploy/nginx-gitcheckup.conf`                    | Origin edge               | **Finding 7** — fixed                                                                                  |
 
 ---
 
-## Recommended order
+## Status
 
-1. **Add the headers block** (Finding 1) — before the site is public, ~20 lines.
-2. **Validate the canonical slug** (Finding 3) — two lines, removes the one
-   place that trusts an upstream string.
-3. **Track `drizzle-kit`** (Finding 2) — nothing to do today.
+Findings 1, 2, 3, 5 and 7 are fixed. 4 and 6 are accepted and documented above.
+
+What is left is not a finding but a standing obligation: the Cloudflare
+allowlist has to stay current or it starts refusing real visitors. That is what
+`cloudflare-ips.timer` is for, and `journalctl -u cloudflare-ips.service` is
+where to look if the site ever 403s for no apparent reason.

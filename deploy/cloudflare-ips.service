@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh the nginx Cloudflare allowlist
+Documentation=file:/usr/local/sbin/refresh-cloudflare-ips.sh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/refresh-cloudflare-ips.sh

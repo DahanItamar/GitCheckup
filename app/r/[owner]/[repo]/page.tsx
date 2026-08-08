@@ -16,7 +16,7 @@ import { TipList } from "@/components/TipList";
 import { clientIpFrom } from "@/lib/client-ip";
 import { DEMO_MODE, SITE_URL } from "@/lib/config";
 import { isGitCheckupError } from "@/lib/errors";
-import { parseRepoSlug } from "@/lib/repo-slug";
+import { parseRepoSlug, slugPath } from "@/lib/repo-slug";
 import {
   getScoreHistory,
   type ScoreHistoryView,
@@ -116,9 +116,21 @@ export default async function ResultPage({ params }: RouteParams) {
   // it is cosmetic: `findLatestScore` resolves the old slug through
   // `repo_aliases`, so both URLs are cache hits either way, and
   // `generateMetadata` still emits a correct card for whichever was requested.
-  const canonical = { owner: result.repo.owner, name: result.repo.name };
-  if (canonical.owner !== slug.owner || canonical.name !== slug.name) {
-    redirect(`/r/${canonical.owner}/${canonical.name}`);
+  //
+  // Re-parsed rather than trusted. These two strings come from the GitHub API
+  // response, not from `parseRepoSlug`, and this is the only place in the app
+  // where an upstream value reaches a URL without having crossed that check.
+  // No exploit needs it — the path is relative under `/r/`, and GitHub's own
+  // naming rules exclude `/` and `..` — but "everything crossing the boundary
+  // is validated" is only a rule if it has no exceptions. A slug that fails
+  // falls through and renders under the requested name, which is already a
+  // cache hit via `repo_aliases`.
+  const canonical = parseRepoSlug(`${result.repo.owner}/${result.repo.name}`);
+  if (
+    canonical !== null &&
+    (canonical.owner !== slug.owner || canonical.name !== slug.name)
+  ) {
+    redirect(slugPath(canonical));
   }
 
   // After the score, and never blocking it: the trend is decoration on a page
